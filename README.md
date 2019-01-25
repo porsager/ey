@@ -16,6 +16,7 @@ const ey = require('ey')
 const app = ey()
 
 app
+  .get('/', (req, res) => res.end('Hello World.'))
   .get('/users', getUsers)
   .get('/users/:userId', getUsers)
   .delete('/users/:userId', deleteUser)
