@@ -6,5 +6,5 @@
   "keywords": ["express", "router", "fast", "small", "simple", "zerodeps"],
   "author": "Rasmus Porsager <rasmus@porsager.com>",
   "repository": "porsager/ey",
-  "license": "WTFPL",
+  "license": "WTFPL"
 }

@@ -1,4 +1,4 @@
-# 🐭 Ey - How can i serve you?
+# Ey 🐭 How can i serve you?
 
 The fastest, zero dependency and smallest express style node router.
 
