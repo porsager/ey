@@ -5,7 +5,7 @@ The fastest, zero dependency and smallest express style node router.
 Ey supports plain string, regex, and parameterized routes.
 It also returns a simple (req, res) function to infinitely nest apps in your routing as you please.
 
-Should be compatible with most express / connect packages like [`body-parser`](https://npmjs.org/packages/body-parser), [`serve-static`](https://npmjs.org/packages/serve-static) and [`finalhandler`](https://npmjs.org/packages/finalhandler).
+Should be compatible with most express / connect packages like [`body-parser`](https://npmjs.org/package/body-parser), [`serve-static`](https://npmjs.org/package/serve-static) and [`finalhandler`](https://npmjs.org/package/finalhandler).
 
 ## Getting started
 
