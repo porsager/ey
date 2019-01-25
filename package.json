@@ -1,0 +1,10 @@
+{
+  "name": "ey",
+  "version": "0.2.0",
+  "description": "The fastest, zero dependency and smallest express style node router",
+  "main": "index.js",
+  "keywords": ["express", "router", "fast", "small", "simple", "zerodeps"],
+  "author": "Rasmus Porsager <rasmus@porsager.com>",
+  "repository": "porsager/ey",
+  "license": "WTFPL",
+}
