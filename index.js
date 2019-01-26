@@ -53,21 +53,20 @@ function next(method, i, req, res) {
     : next(method, i + 1, req, res)
 }
 
-function matcher(req, res, match, use) {
-  const result = use
-    ? req.url.replace(pathRegex, '').indexOf(match) === 0
-    : req.url.replace(pathRegex, '') === match
-
-  use && (req.url = req.url.slice(match.length))
-
-  return result
-}
-
 function prepareString(match, use) {
   const named = match.match(/\/:([a-z0-9]+)?/g)
 
-  if (!named)
-    return (req, res) => matcher(req, res, match, use)
+  if (!named) {
+    if (use) {
+      return (req, res) => {
+        const result = req.url.replace(pathRegex, '').indexOf(match) === 0
+        use && (req.url = req.url.slice(match.length))
+        return result
+      }
+    }
+
+    return (req, res) => req.url === match || req.url.replace(pathRegex, '') === match
+  }
 
   const names = named.map(n => n.slice(2))
   const regex = new RegExp('^' + match.replace(/:.+?(\/|$)/g, '(.*?)/') + '?$')
