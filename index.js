@@ -85,7 +85,7 @@ function prepareString(match, use) {
 
 function prepareRegex(match) {
   return function(req, res) {
-    const result = req.url.match(match)
+    const result = req.url.replace(pathRegex, '').match(match)
     req.params = req.params || {}
     result && result.forEach((m, i) => req.params[i] = m)
     return result
