@@ -1,6 +1,6 @@
 # Ey 🐭 How can i serve you?
 
-The fastest, zero dependency and smallest express style node router.
+The fastest, zero dependency, small express style node router.
 
 Ey supports plain string, regex, and parameterized routes.
 It also returns a simple (req, res) function to infinitely nest apps in your routing as you please.

@@ -1,8 +1,8 @@
 const pathRegex = /[#?].*/
-const methodNames = ['GET', 'PUT', 'POST', 'DELETE', 'PATCH', 'OPTIONS']
+const methodNames = ['HEAD', 'GET', 'PUT', 'POST', 'DELETE', 'PATCH', 'OPTIONS']
 
 function Crouter() {
-  const handlers = methodNames.reduce((acc, method) => {
+  const methods = methodNames.concat('all').reduce((acc, method) => {
     acc[method] = {
       matchers: [],
       handlers: []
@@ -10,28 +10,36 @@ function Crouter() {
     return acc
   }, {})
 
-  const crouter = function(req, res) {
-    next(handlers[req.method], 0, req, res)
+  const crouter = function(req, res, n) {
+    tryRoute(req.method in methods ? methods[req.method] : methods.all, 0, req, res, n)
   }
 
-  methodNames.concat('all', 'use').forEach(method => {
-    const handler = handlers[method]
+  methodNames.concat('all', 'use').forEach(methodName => {
+    const method = methods[methodName]
 
-    crouter[method.toLowerCase()] = function Add(match, ...fns) {
+    crouter[methodName.toLowerCase()] = function(match, ...fns) {
       if (typeof match === 'function') {
         fns.unshift(match)
         match = true
       }
 
       fns.forEach(fn => {
-        if (method === 'all' || method === 'use') {
-          for (const key in handlers) {
-            handlers[key].matchers.push(prepare(match, method === 'use'))
-            handlers[key].length = handlers[key].handlers.push(fn)
+        if (typeof fn !== 'function')
+          throw new Error(fn + ' is not a function')
+
+        const matcher = prepare(match, methodName === 'use')
+        if (methodName === 'all' || methodName === 'use') {
+          for (const key in methods) {
+            methods[key].matchers.push(matcher)
+            methods[key].length = methods[key].handlers.push(fn)
           }
         } else {
-          handler.matchers.push(prepare(match))
-          handler.length = handler.handlers.push(fn)
+          method.matchers.push(matcher)
+          method.length = method.handlers.push(fn)
+          if (methodName === 'GET') {
+            methods.HEAD.matchers.push(matcher)
+            methods.HEAD.length = methods.HEAD.handlers.push(fn)
+          }
         }
       })
 
@@ -44,28 +52,36 @@ function Crouter() {
 
 module.exports = Crouter
 
-function next(method, i, req, res) {
-  if (i >= method.length)
-    return
+function tryRoute(method, i, req, res, next) { // eslint-disable-line
+  if (!method.length || i >= method.length)
+    return next && next()
 
-  method.matchers[i](req, res)
-    ? method.handlers[i](req, res, () => next(method, i + 1, req, res))
-    : next(method, i + 1, req, res)
+  const matcher = method.matchers[i]
+      , match = matcher(req, res)
+
+  if (!match)
+    return tryRoute(method, i + 1, req, res, next)
+
+  if (matcher.use) {
+    req.originalUrl = req.originalUrl || req.url
+    req._url = req._url || []
+    req._url.push(req.url)
+    req.url = req.url.slice(match.length)
+  }
+
+  method.handlers[i](req, res, () => {
+    matcher.use && (req.url = req._url.pop() || req.url)
+    tryRoute(method, i + 1, req, res, next)
+  })
 }
 
 function prepareString(match, use) {
   const named = match.match(/\/:([a-z0-9]+)?/g)
 
   if (!named) {
-    if (use) {
-      return (req, res) => {
-        const result = req.url.replace(pathRegex, '').indexOf(match) === 0
-        use && (req.url = req.url.slice(match.length))
-        return result
-      }
-    }
-
-    return (req, res) => req.url === match || req.url.replace(pathRegex, '') === match
+    return use
+      ? (req, res) => req.url.indexOf(match) === 0 && match
+      : (req, res) => (req.url === match || req.url.replace(pathRegex, '') === match) && match
   }
 
   const names = named.map(n => n.slice(2))
@@ -78,8 +94,7 @@ function prepareString(match, use) {
       req.path = result[0]
       names.forEach((n, i) => req.params[n] = result[i + 1])
     }
-    use && (req.url = req.url.slice(result[0].length))
-    return result
+    return result[0]
   }
 }
 
@@ -88,7 +103,7 @@ function prepareRegex(match) {
     const result = req.url.replace(pathRegex, '').match(match)
     req.params = req.params || {}
     result && result.forEach((m, i) => req.params[i] = m)
-    return result
+    return result && result[0]
   }
 }
 
@@ -100,14 +115,17 @@ function prepareArray(match, use) {
 }
 
 function prepare(match, use) {
-  if (typeof match === 'string')
-    return prepareString(match, use)
-  else if (match instanceof RegExp)
-    return prepareRegex(match, use)
-  else if (Array.isArray(match))
-    return prepareArray(match, use)
-  else if (match === true)
-    return () => true
+  const fn = typeof match === 'string'
+    ? prepareString(match, use)
+    : match instanceof RegExp
+      ? prepareRegex(match, use)
+      : Array.isArray(match)
+        ? prepareArray(match, use)
+        : match === true && (() => true)
 
-  throw new Error('Unknown match type')
+  if (!fn)
+    throw new Error('Unknown match type')
+
+  fn.use = use
+  return fn
 }
