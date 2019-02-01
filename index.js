@@ -93,7 +93,7 @@ function prepareString(match, use) {
       req.path = result[0]
       names.forEach((n, i) => req.params[n] = result[i + 1])
     }
-    return result[0]
+    return result && result[0]
   }
 }
 
