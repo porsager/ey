@@ -1,6 +1,6 @@
 {
   "name": "ey",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "The fastest, zero dependency and smallest express style node router",
   "main": "index.js",
   "keywords": ["express", "router", "fast", "small", "simple", "zerodeps"],
