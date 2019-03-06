@@ -91,7 +91,7 @@ function prepareString(match, use) {
     if (result) {
       req.params = req.params || {}
       req.path = result[0]
-      names.forEach((n, i) => req.params[n] = result[i + 1])
+      names.forEach((n, i) => req.params[n] = decodeURIComponent(result[i + 1]))
     }
     return result && result[0]
   }
