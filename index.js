@@ -1,7 +1,7 @@
 const pathRegex = /[#?].*/
 const methodNames = ['HEAD', 'GET', 'PUT', 'POST', 'DELETE', 'PATCH', 'OPTIONS']
 
-function Crouter() {
+function Ey() {
   const methods = methodNames.concat('all').reduce((acc, method) => {
     acc[method] = {
       matchers: [],
@@ -11,6 +11,7 @@ function Crouter() {
   }, {})
 
   const crouter = function(req, res, n) {
+    req.pathname = req.url.replace(pathRegex, '')
     tryRoute(req.method in methods ? methods[req.method] : methods.all, 0, req, res, n)
   }
 
@@ -50,7 +51,7 @@ function Crouter() {
   return crouter
 }
 
-module.exports = Crouter
+module.exports = Ey
 
 function tryRoute(method, i, req, res, next) { // eslint-disable-line
   if (!method.length || i >= method.length)
@@ -81,13 +82,13 @@ function prepareString(match, use) {
   if (!named) {
     return use
       ? (req, res) => req.url.indexOf(match) === 0 && match
-      : (req, res) => (req.url === match || req.url.replace(pathRegex, '') === match) && match
+      : (req, res) => (req.url === match || req.pathname === match) && match
   }
 
   const names = named.map(n => n.slice(2))
   const regex = new RegExp('^' + match.replace(/:.+?(\/|$)/g, '([^/]*?)/') + '?$')
   return function(req, res) {
-    const result = req.url.replace(pathRegex, '').match(regex)
+    const result = req.pathname.match(regex)
     if (result) {
       req.params = req.params || {}
       req.path = result[0]
@@ -99,7 +100,7 @@ function prepareString(match, use) {
 
 function prepareRegex(match) {
   return function(req, res) {
-    const result = req.url.replace(pathRegex, '').match(match)
+    const result = req.pathname.match(match)
     req.params = req.params || {}
     result && result.forEach((m, i) => req.params[i] = m)
     return result && result[0]
