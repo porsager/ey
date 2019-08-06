@@ -77,7 +77,7 @@ function tryRoute(method, i, req, res, next) { // eslint-disable-line
 }
 
 function prepareString(match, use) {
-  const named = match.match(/\/:([a-z0-9]+)?/g)
+  const named = match.match(/\/:([a-z0-9_]+)?/g)
 
   if (!named) {
     return use
