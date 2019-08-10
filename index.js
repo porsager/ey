@@ -86,7 +86,7 @@ function prepareString(match, use) {
   }
 
   const names = named.map(n => n.slice(2))
-  const regex = new RegExp('^' + match.replace(/:.+?(\/|$)/g, '([^/]*?)/') + '?$')
+  const regex = new RegExp('^' + match.replace(/:.+?(\/|$)/g, '([^/]+?)/') + '?$')
   return function(req, res) {
     const result = req.pathname.match(regex)
     if (result) {
