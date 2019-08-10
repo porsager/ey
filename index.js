@@ -82,7 +82,7 @@ function prepareString(match, use) {
   if (!named) {
     return use
       ? (req, res) => req.url.indexOf(match) === 0 && match
-      : (req, res) => (req.url === match || req.pathname === match) && match
+      : (req, res) => (req.url === match || req.pathname === match || req.url + '/' === match || req.pathname + '/' === match) && match
   }
 
   const names = named.map(n => n.slice(2))
