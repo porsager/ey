@@ -10,7 +10,7 @@ function Ey() {
     return acc
   }, {})
 
-  const crouter = function(req, res, n) {
+  const router = function(req, res, n) {
     req.pathname = req.url.replace(pathRegex, '')
     tryRoute(req.method in methods ? methods[req.method] : methods.all, 0, req, res, n)
   }
@@ -18,7 +18,7 @@ function Ey() {
   methodNames.concat('all', 'use').forEach(methodName => {
     const method = methods[methodName]
 
-    crouter[methodName.toLowerCase()] = function(match, ...fns) {
+    router[methodName.toLowerCase()] = function(match, ...fns) {
       if (typeof match === 'function') {
         fns.unshift(match)
         match = true
@@ -44,11 +44,11 @@ function Ey() {
         }
       })
 
-      return crouter
+      return router
     }
   })
 
-  return crouter
+  return router
 }
 
 module.exports = Ey
