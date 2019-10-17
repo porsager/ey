@@ -70,10 +70,17 @@ function tryRoute(method, i, req, res, next) { // eslint-disable-line
     req.url = req.url.slice(match.length)
   }
 
-  method.handlers[i](req, res, () => {
+  const nextFn = () => {
+    if (nextFn.called)
+      throw new Error('Next called twice')
+
+    nextFn.called = true
     matcher.use && (req.url = req._url.pop() || req.url)
     tryRoute(method, i + 1, req, res, next)
-  })
+  }
+
+  req.body = method.handlers[i](req, res, nextFn)
+  req.body && typeof req.body.then === 'function' && nextFn()
 }
 
 function prepareString(match, use) {
