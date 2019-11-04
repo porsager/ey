@@ -51,6 +51,9 @@ function Ey() {
   return router
 }
 
+Ey.async = (req, res, next) => (res.await = true, next())
+Ey.await = fn => (req, res) => (res.await = false, fn)
+
 module.exports = Ey
 
 function tryRoute(method, i, req, res, next) { // eslint-disable-line
@@ -79,8 +82,8 @@ function tryRoute(method, i, req, res, next) { // eslint-disable-line
     tryRoute(method, i + 1, req, res, next)
   }
 
-  req.body = method.handlers[i](req, res, nextFn)
-  req.body && typeof req.body.then === 'function' && nextFn()
+  res.body = method.handlers[i](req, res, !res.await && nextFn)
+  res.await && Promise.resolve(res.body).then(nextFn)
 }
 
 function prepareString(match, use) {
