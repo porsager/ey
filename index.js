@@ -52,7 +52,7 @@ function Ey() {
 }
 
 Ey.async = (req, res, next) => (res.await = true, next())
-Ey.await = fn => (req, res) => (res.await = false, fn)
+Ey.await = fn => (req, res) => (res.await = false, fn(req, res))
 
 module.exports = Ey
 
@@ -73,17 +73,13 @@ function tryRoute(method, i, req, res, next) { // eslint-disable-line
     req.url = req.url.slice(match.length)
   }
 
-  const nextFn = () => {
-    if (nextFn.called)
-      throw new Error('Next called twice')
+  res.body = method.handlers[i](req, res, nextFn)
+  res.await && nextFn()
 
-    nextFn.called = true
+  function nextFn() {
     matcher.use && (req.url = req._url.pop() || req.url)
     tryRoute(method, i + 1, req, res, next)
   }
-
-  res.body = method.handlers[i](req, res, !res.await && nextFn)
-  res.await && Promise.resolve(res.body).then(nextFn)
 }
 
 function prepareString(match, use) {
