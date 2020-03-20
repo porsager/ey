@@ -1,6 +1,6 @@
 const ey = require('../../')
     , http = require('http')
-    , things = require('./things')
+    , things = require('./routes/things')
 
 const route = ey()
 
