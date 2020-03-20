@@ -39,8 +39,7 @@ route.use(ey.await((req, res) => {
     })
     .catch(err => {
       res.statusCode = 500
-      console.error(err)
       res.end(JSON.stringify({ error: err.message }))
-      throw err
+      console.error(err)
     })
 }))
