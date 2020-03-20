@@ -1,5 +1,5 @@
-const ey = require('../../')
-    , sql = require('./db')
+const ey = require('../../../')
+    , sql = require('../db')
     , bodyParser = require('body-parser')
 
 const route = module.exports = ey()
