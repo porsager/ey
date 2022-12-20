@@ -1,9 +1,19 @@
 {
   "name": "ey",
-  "version": "0.9.1",
-  "description": "The fastest, zero dependency and smallest express style node router",
-  "main": "index.js",
+  "version": "1.0.0-beta.0",
+  "description": "Ey is an ergonomic and fast server+router, using uWebSockets.js under the hood",
+  "main": "src/index.js",
+  "type": "module",
+  "author": "Rasmus Porsager <rasmus@porsager.com>",
+  "repository": "porsager/ey",
+  "license": "Unlicense",
+  "scripts": {
+    "test": "echo some day"
+  },
   "keywords": [
+    "uws",
+    "uWebSockets",
+    "uWebSockets.js",
     "express",
     "router",
     "fast",
@@ -11,7 +21,7 @@
     "simple",
     "zerodeps"
   ],
-  "author": "Rasmus Porsager <rasmus@porsager.com>",
-  "repository": "porsager/ey",
-  "license": "WTFPL"
+  "peerDependencies": {
+    "uWebSockets.js": "github:uNetworking/uWebSockets.js#semver:v20.15.0"
+  }
 }
