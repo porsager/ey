@@ -183,19 +183,17 @@ export default class Request {
     if (this.handled)
       return (this[$.res].end(body), this.ended = true, this)
 
-    typeof body === 'number' && (status = body, body = undefined, headers = status)
-    typeof status === 'object' && (headers = status, status = null)
-    headers && this.set(headers)
-    this.handled = true
-    this.head(status, headers, () => {
+    typeof body === 'number' && (headers = status, status = body, body = undefined)
+    typeof status === 'object' && (headers = status, status = undefined)
+    return this.head(status || 200, headers, () => {
       this[$.res].end(body || '')
       this.ended = true
     })
-    return this
   }
 
   head(status, headers, fn) {
-    typeof status === 'number' || (headers = status, status = null)
+    this.handled = true
+    headers && this.set(headers)
     this.aborted || this.cork(() => {
       status && this[$.res].writeStatus(status + ' ' + STATUS_CODES[status])
       this[$.headers] && this[$.headers].forEach(xs => this[$.res].writeHeader(...xs))
