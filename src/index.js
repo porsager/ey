@@ -125,6 +125,7 @@ export default function ey({
           value: {
             data,
             binary,
+            get buffer() { return Buffer.from(data) },
             get json() { return tryJSON(data) },
             get text() { return Buffer.from(data).toString() }
           }
