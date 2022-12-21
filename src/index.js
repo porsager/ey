@@ -265,20 +265,20 @@ function prepareArray(match, sub) {
 function upgrader(pattern, options) {
   options.headers && options.headers.push('sec-websocket-key', 'sec-websocket-protocol', 'sec-websocket-extensions')
   return async function(res, req, context) {
-    const newRes = new Request(res, req, options)
-    ;(pattern.match(/\/:([^/]+|$)/g) || []).map((x, i) => newRes.params[x.slice(2)] = res.getParameter(i))
-    newRes[$.read](options)
-    let x = options.upgrade(newRes)
+    const r = new Request(res, req, options)
+    ;(pattern.match(/\/:([^/]+|$)/g) || []).map((x, i) => r.params[x.slice(2)] = res.getParameter(i))
+    r[$.read](options)
+    let x = options.upgrade(r)
     x && typeof x.then === 'function' && (res.onAborted(), x = await x)
     if (x.aborted || x.handled)
       return
 
-    newRes[$.headers] && newRes.head(101)
+    r[$.headers] && r.head(101)
     res.upgrade(
       x || {},
-      newRes.headers['sec-websocket-key'],
-      newRes.headers['sec-websocket-protocol'],
-      newRes.headers['sec-websocket-extensions'],
+      r.headers['sec-websocket-key'],
+      r.headers['sec-websocket-protocol'],
+      r.headers['sec-websocket-extensions'],
       context
     )
   }

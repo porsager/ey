@@ -56,7 +56,7 @@ Returns an object representing the cookie
 
 #### `.end(body, [status], [headers])`
 
-#### `.head([status], [headers])`
+#### `.head([status], [headers], [cork_last])`
 
 #### `.set(header, value) | r.set({ header: value })`
 
