@@ -8,6 +8,7 @@ export const symbols = {
   body: Symbol('body'),
   query: Symbol('query'),
   abort: Symbol('abort'),
+  error: Symbol('error'),
   options: Symbol('options'),
   resolve: Symbol('resolve'),
   headers: Symbol('headers'),

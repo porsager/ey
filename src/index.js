@@ -42,11 +42,8 @@ export default function ey({
     const r = res instanceof Request ? res : new Request(res, req, o)
     const method = handlers.has(r.method) ? handlers.get(r.method) : handlers.get('all')
 
-    let error
-      , errored = false
-
     for (const x of method) {
-      if (errored !== x.error)
+      if (hasOwn.call(r, $.error) !== x.error)
         continue
 
       const match = x.match(r)
@@ -54,15 +51,14 @@ export default function ey({
         continue
 
       try {
-        let result = x.handler({ error, r, match })
+        let result = x.handler({ error: r[$.error], r, match })
         r[$.req] && r[$.read](x.options)
         if (result && typeof result.then === 'function') {
           r.onAborted()
           r.last = await result
         }
-      } catch (e) {
-        error = e
-        errored = true
+      } catch (error) {
+        r[$.error] = error
       }
 
       if (r.handled)
@@ -70,8 +66,8 @@ export default function ey({
     }
 
     return listener && !r.handled && ( // Ensure we only use default in listening router
-      error
-        ? (r.end(STATUS_CODES[500], 500), console.error('Uncaught route error', error))
+      hasOwn.call(r, $.error)
+        ? (r.end(STATUS_CODES[500], 500), console.error('Uncaught route error', r[$.error]))
         : r.end(STATUS_CODES[404], 404)
     )
   }
