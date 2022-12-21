@@ -37,7 +37,7 @@ const caches = {
 export default class Request {
   constructor(res, req, options = {}) {
     this.method = req.getMethod()
-    this.url = req.getUrl()
+    this.url = decodeURIComponent(req.getUrl())
     this.pathname = this.url
     this.params = {}
     this.headers = {}
