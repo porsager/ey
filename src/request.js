@@ -61,7 +61,7 @@ export default class Request {
       resolve({
         value: {
           data,
-          get buffer() { return Buffer.from(data) },
+          get buffer() { return Buffer.from(Buffer.from(data)) },
           get text() { return Buffer.from(data).toString() }
         }
       })
