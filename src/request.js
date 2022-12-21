@@ -3,6 +3,7 @@ import zlib             from 'node:zlib'
 import { promisify }    from 'node:util'
 import path             from 'node:path'
 import { STATUS_CODES } from 'node:http'
+import Stream           from 'node:stream'
 
 import mimes, { compressable } from './mimes.js'
 import {
@@ -135,6 +136,64 @@ export default class Request {
         ? [...remoteIP.slice(12)].join('.')
         : Buffer.from(this[$.res].getRemoteAddressAsText()).toString()
     ).replace(/(^|:)0+/g, '$1').replace(/::/g, '').replace(':1', '::1')
+  }
+
+  get readable() {
+    const r = this // eslint-disable-line
+    if (hasOwn.call(r, $.readable))
+      return r[$.readable]
+
+    const stream = r[$.readable] = new Stream.Readable({
+      read() { r.resume() }
+    })
+
+    start()
+
+    return stream
+
+    async function start() {
+      try {
+        for await (const { buffer } of r)
+          stream.push(buffer) || r[$.res].pause()
+
+        stream.push(null)
+      } catch (error) {
+        stream.destroy(error)
+      }
+    }
+  }
+
+  get writable() {
+    const r = this // eslint-disable-line
+    if (hasOwn.call(r, $.writable))
+      return r[$.writable]
+
+    r.onAborted()
+    r.handled = true
+    return r[$.writable] = new Stream.Writable({
+      autoDestroy: true,
+      write(chunk, encoding, callback) {
+        r.write(chunk)
+          ? callback()
+          : r.onWritable(() => (callback(), true))
+      },
+      destroy(error, callback) {
+        callback(error)
+        r.close()
+      },
+      final(callback) {
+        r.end()
+        callback()
+      }
+    })
+  }
+
+  resume() {
+    return this.handled || this.aborted || this[$.res].resume()
+  }
+
+  pause() {
+    return this.handled || this.aborted || this[$.res].pause()
   }
 
   cookie(name, value, options) {
