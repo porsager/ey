@@ -270,7 +270,11 @@ function upgrader(pattern, options) {
     newRes[$.read](options)
     let x = options.upgrade(newRes)
     x && typeof x.then === 'function' && (res.onAborted(), x = await x)
-    x.aborted || x.handled || res.upgrade(
+    if (x.aborted || x.handled)
+      return
+
+    newRes[$.headers] && newRes.head(101)
+    res.upgrade(
       x || {},
       newRes.headers['sec-websocket-key'],
       newRes.headers['sec-websocket-protocol'],
