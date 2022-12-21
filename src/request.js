@@ -142,7 +142,7 @@ export default class Request {
       return getCookie(name, this.headers.cookie)
 
     if (options.Expires && options.Expires instanceof Date)
-      options.Expires = options.expires.toUTCString()
+      options.Expires = options.Expires.toUTCString()
 
     return this.set(
       'Set-Cookie',
