@@ -25,7 +25,7 @@ export default function ey({
   hasOwn.call(o, 'compressions') || (o.compressions = o.secure ? ['br', 'gzip', 'deflate'] : ['gzip', 'deflate'])
   methods.forEach(register)
 
-  router[$.ey] = handlers
+  router.handlers = handlers
   router.ws = ws
   router.connect = (...xs) => connects.add(xs)
   router.listen = listen(o)
@@ -169,7 +169,7 @@ export default function ey({
         if (typeof fn !== 'function')
           throw new Error(fn + ' is not a function')
 
-        const isRouter = hasOwn.call(fn, $.ey)
+        const isRouter = hasOwn.call(fn, 'handlers')
         const route = {
           options,
           handler: handler(fn),
@@ -192,7 +192,7 @@ export default function ey({
 }
 
 function handler(fn) {
-  return hasOwn.call(fn, $.ey)
+  return hasOwn.call(fn, 'handlers')
     ? sub
     : direct
 
