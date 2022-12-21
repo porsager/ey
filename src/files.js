@@ -59,7 +59,7 @@ export default function(Ey) {
         .stat(resolve(path.join(r.url, 'index.js')))
         .then(x => x.isFile() && r.pathname + '/index.js')
         .catch(() => null)
-        .then(x => x || fsp.stat(resolve(r.url + 'js')).then(x => x.isFile() && r.pathname + '.js'))
+        .then(x => x || fsp.stat(resolve(r.url + '.js')).then(x => x.isFile() && r.pathname + '.js'))
         .catch(() => null)
         .then(Location => {
           if (!Location)
