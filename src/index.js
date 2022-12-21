@@ -106,13 +106,12 @@ export default function ey({
     }
   }
 
-  function ws(x, options, fn) {
-    typeof options === 'function'
-      ? (fn = options, options = {}, typeof x === 'string' || (x = '/*'))
-      : typeof x === 'function' && (fn = x, options = {}, x = '/*')
+  function ws(pattern, options, fn) {
+    typeof pattern !== 'string' && (fn = options, options = pattern, pattern = '/*')
+    typeof options === 'function' && (fn = options, options = {})
 
     wss.add([
-      x,
+      pattern,
       {
         open: ws => {
           ws[Symbol.asyncIterator] = () => ({
@@ -131,7 +130,7 @@ export default function ey({
           }
         }),
         ...options,
-        ...(options.upgrade ? { upgrade: upgrader(x, options) } : {})
+        ...(options.upgrade ? { upgrade: upgrader(pattern, options) } : {})
       }
     ])
   }
