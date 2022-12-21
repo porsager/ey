@@ -120,7 +120,7 @@ export default function ey({
           })
           fn(ws)
         },
-        close: ws => ws[$.resolve]({ done: true }),
+        close: ws => hasOwn.call(ws, $.resolve) && ws[$.resolve]({ done: true }),
         message: (ws, data, binary) => ws[$.resolve]({
           value: {
             data,
