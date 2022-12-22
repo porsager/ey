@@ -1,6 +1,6 @@
 # Ey
 
-Ey is an ergonomic and fast server+router, using uWebSockets.js under the hood. It has a simple interface embracing todays JS features.
+Ey is an ergonomic and fast server+router, built on uWebSockets (for now). It has a simple interface embracing todays JS features.
 
 ## Getting Started
 
