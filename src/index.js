@@ -3,10 +3,12 @@ import { STATUS_CODES } from 'node:http'
 import { symbols as $, hasOwn } from './shared.js'
 import Request from './request.js'
 import files from './files.js'
+import mimes from './mimes.js'
 
 import uWS from 'uWebSockets.js'
 
 ey.files = files(ey)
+ey.mimes = mimes
 
 export default function ey({
   methods = ['head', 'get', 'put', 'post', 'delete', 'patch', 'options', 'trace', 'all'],
