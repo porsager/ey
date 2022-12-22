@@ -21,7 +21,7 @@
     "simple",
     "zerodeps"
   ],
-  "peerDependencies": {
-    "uWebSockets.js": "github:uNetworking/uWebSockets.js#semver:20.15.0"
+  "dependencies": {
+    "uWebSockets.js": "github:uNetworking/uWebSockets.js#semver:20.x.x"
   }
 }
