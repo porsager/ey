@@ -7,8 +7,6 @@ import mimes from './mimes.js'
 
 import uWS from 'uWebSockets.js'
 
-ey.files = files(ey)
-ey.mimes = mimes
 
 export default function ey({
   methods = ['head', 'get', 'put', 'post', 'delete', 'patch', 'options', 'trace', 'all'],
@@ -27,6 +25,9 @@ export default function ey({
   hasOwn.call(o, 'compressions') || (o.compressions = o.secure ? ['br', 'gzip', 'deflate'] : ['gzip', 'deflate'])
   methods.forEach(register)
 
+  router.route = route
+  router.mimes = mimes
+  router.files = files(ey)
   router.handlers = handlers
   router.ws = ws
   router.connect = (...xs) => connects.add(xs)
@@ -39,6 +40,17 @@ export default function ey({
   router.unlisten = () => listener && uWS.us_listen_socket_close(listener)
 
   return router
+
+  function route(...xs) {
+    const x = xs.pop()
+    if (typeof x !== 'function')
+      return ey(x)
+
+    const app = ey()
+    x(app)
+    router.all(...xs, app)
+    return router
+  }
 
   async function router(res, req) {
     const r = res instanceof Request ? res : new Request(res, req, o)
