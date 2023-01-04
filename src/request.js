@@ -418,7 +418,7 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
     stream.on('error', x => reject(x))
     stream.on('data', compressor ? writeData : tryData)
 
-    r.head(range ? 216 : 200, {
+    r.head(range ? 206 : 200, {
       'Accept-Ranges': range ? undefined : 'bytes',
       'Last-Modified': mtime.toUTCString(),
       'Content-Encoding': compressor,
