@@ -402,6 +402,8 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
     if (r.aborted)
       return cleanup()
 
+    r.onAborted(cleanup)
+
     const range = r.headers.range || ''
         , highWaterMark = options.highWaterMark || 256 * 1024
         , end = parseInt(range.slice(range.indexOf('-') + 1)) || size - 1
@@ -437,16 +439,18 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
     let lastOffset
       , ab
 
-    r.onWritable(compressor
-      ? resumeWrite
-      : resumeTry
-    )
+    r.onWritable(compressor ? writeResume : tryResume)
 
     await promise
     cleanup()
 
     function writeData(x) {
       r[$.res].write(x) || stream.pause()
+    }
+
+    function writeResume() {
+      stream.resume()
+      return true
     }
 
     function tryData(x) {
@@ -459,12 +463,7 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
         : ok || stream.pause()
     }
 
-    function resumeWrite() {
-      stream.resume()
-      return true
-    }
-
-    function resumeTry(offset) {
+    function tryResume(offset) {
       const [ok, done] = r.tryEnd(ab.slice(offset - lastOffset), total)
       done
         ? resolve(r.ended = true)
@@ -478,7 +477,7 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
   }
 
   function cleanup() {
-    r.ended || (r[$.res].end(), r.ended = true)
+    r.ended || r.aborted || (r[$.res].end(), r.ended = true)
     handle && handle.close()
     stream && stream.destroy()
     stream = handle = null
