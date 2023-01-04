@@ -311,17 +311,16 @@ export default class Request {
     return this.end(JSON.stringify(body), ...xs)
   }
 
-  file(file, {
-    lastModified = true,
-    etag = true,
-    minStreamSize = 512 * 1024,
-    maxCacheSize = 128 * 1024,
-    minCompressSize = 1280,
-    ...options
-  } = {
-    // todo fix options and defaults
-    cache: true
-  }) {
+  file(file, options) {
+    options = Object.assign({
+      lastModified: true,
+      etag: true,
+      minStreamSize: 512 * 1024,
+      maxCacheSize: 128 * 1024,
+      minCompressSize: 1280,
+      cache: true
+    }, options)
+
     file = path.isAbsolute(file) ? file : path.join(cwd, file)
     const compressions = options.compressions || this[$.options].compressions
         , cache = options.cache || this[$.options].cache
