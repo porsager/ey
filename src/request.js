@@ -56,8 +56,10 @@ export default class Request {
 
   [Symbol.asyncIterator]() {
     let resolve
+      , reject
       , done
 
+    this.onAborted(() => reject(new Error('Aborted')))
     this[$.res].onData((data, isLast) => {
       resolve({
         value: {
@@ -69,7 +71,7 @@ export default class Request {
       isLast && (done = { done: true })
     })
     return {
-      next: () => done || new Promise(r => resolve = r)
+      next: () => done || new Promise((r, e) => (resolve = r, reject = e))
     }
   }
 
@@ -168,9 +170,7 @@ export default class Request {
     if (hasOwn.call(r, $.writable))
       return r[$.writable]
 
-    r.onAborted()
-    r.handled = true
-    return r[$.writable] = new Stream.Writable({
+    const writable = r[$.writable] = new Stream.Writable({
       autoDestroy: true,
       write(chunk, encoding, callback) {
         r.write(chunk)
@@ -186,6 +186,11 @@ export default class Request {
         callback()
       }
     })
+
+    r.onAborted(() => writable.destroy(new Error('Aborted')))
+    r.handled = true
+
+    return writable
   }
 
   resume() {
