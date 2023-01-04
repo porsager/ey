@@ -254,7 +254,7 @@ export default class Request {
     this.handled = true
     headers && this.set(headers)
     this.aborted || this.cork(() => {
-      status && this[$.res].writeStatus(status + ' ' + STATUS_CODES[status])
+      status && this[$.res].writeStatus(status + (status in STATUS_CODES ? ' ' + STATUS_CODES[status] : ''))
       this[$.headers] && this[$.headers].forEach(xs => this[$.res].writeHeader(...xs))
       fn && fn()
     })
