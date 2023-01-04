@@ -357,7 +357,7 @@ async function read(r, file, type, compressor, o) {
     handle.close()
 
     if (o.transform)
-      bytes = o.transform(bytes, r)
+      bytes = o.transform(bytes, file, type, r)
 
     if (bytes && typeof bytes.then === 'function')
       bytes = await bytes
