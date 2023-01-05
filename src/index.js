@@ -103,7 +103,7 @@ export default function ey({
         uws.any('/*', router)
 
         address
-          ? uws.listen(port, address, callback)
+          ? uws.listen(address, port, callback)
           : options
           ? uws.listen(port, options, callback)
           : uws.listen(port, callback)
