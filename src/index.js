@@ -85,7 +85,7 @@ export default function ey({
     )
   }
 
-  function listen({ cert, key }) {
+  function listen({ cert, key, ...options }) {
     return (port, options) => {
       return new Promise((resolve, reject) => {
         let address
@@ -94,7 +94,9 @@ export default function ey({
         typeof options === 'string' && (address = options, options = null)
 
         router.unlisten()
-        uws = cert ? uWS.SSLApp({ cert, key }) : uWS.App()
+        uws = cert
+          ? uWS.SSLApp({ cert_file_name: cert, key_file_name: key, ...o, ...options })
+          : uWS.App()
         asn.forEach(xs => uws.addServerName(...xs))
         msn.forEach(xs => uws.missingServerName(...xs))
         rsn.forEach(xs => uws.removeServerName(...xs))
