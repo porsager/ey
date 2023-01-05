@@ -94,7 +94,7 @@ export default function ey({
         typeof options === 'string' && (address = options, options = null)
 
         router.unlisten()
-        uws = cert ? uWS.SSLApp({}) : uWS.App()
+        uws = cert ? uWS.SSLApp({ cert, key }) : uWS.App()
         asn.forEach(xs => uws.addServerName(...xs))
         msn.forEach(xs => uws.missingServerName(...xs))
         rsn.forEach(xs => uws.removeServerName(...xs))
