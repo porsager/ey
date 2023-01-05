@@ -52,6 +52,7 @@ export default class Request {
     this[$.query] = req.getQuery()
     this[$.abort] = undefined
     this[$.headers] = undefined
+    this[$.headersRead] = undefined
   }
 
   [Symbol.asyncIterator]() {
@@ -220,9 +221,12 @@ export default class Request {
   }
 
   [$.read](options = {}) {
+    if (!this[$.req] || this[$.headersRead])
+      return
+
     options.headers
       ? options.headers.forEach(k => this.headers[k] = this[$.req].getHeader(k))
-      : this[$.req].forEach((k, v) => this.headers[k] = v)
+      : (this[$.headersRead] = true, this[$.req].forEach((k, v) => this.headers[k] = v))
   }
 
   set(h, v) {

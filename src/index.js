@@ -7,7 +7,6 @@ import mimes from './mimes.js'
 
 import uWS from 'uWebSockets.js'
 
-
 export default function ey({
   methods = ['head', 'get', 'put', 'post', 'delete', 'patch', 'options', 'trace', 'all'],
   ...o
@@ -65,8 +64,8 @@ export default function ey({
         continue
 
       try {
-        let result = x.handler({ error: r[$.error], r, match })
         r[$.req] && r[$.read](x.options)
+        let result = x.handler({ error: r[$.error], r, match })
         if (result && typeof result.then === 'function') {
           r.onAborted()
           r.last = await result
