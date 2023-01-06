@@ -59,7 +59,7 @@ export default function(Ey) {
     function tryJs(r) {
       return fsp
         .stat(resolve(path.join(r.url, 'index.js')))
-        .then(x => x.isFile() && r.pathname + '/index.js')
+        .then(x => x.isFile() && trimSlash(r.pathname) + '/index.js')
         .catch(() => null)
         .then(x => x || fsp.stat(resolve(r.url + '.js')).then(x => x.isFile() && r.pathname + '.js'))
         .catch(() => null)
