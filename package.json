@@ -10,6 +10,9 @@
   "scripts": {
     "test": "echo some day"
   },
+  "files": [
+    "/src"
+  ],
   "keywords": [
     "uws",
     "uWebSockets",
