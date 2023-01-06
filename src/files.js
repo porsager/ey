@@ -28,11 +28,12 @@ export default function(Ey) {
     function cache(r) {
       const url = trimSlash(r.pathname)
 
-      if (redirect && redirects.has(url))
-        return r.end(...redirects.get(url))
-
-      if (rewrite && rewrites.has(url))
-        return r.url = rewrites.get(url)
+      if (r.headers.accept) {
+        if (rewrite && r.headers.accept.indexOf('text/html') === 0 && rewrites.has(url))
+          return r.url = rewrites.get(url)
+        else if (redirect && r.headers.accept === '*/*' && redirects.has(url))
+          return r.end(...redirects.get(url))
+      }
     }
 
     async function file(r) {
@@ -47,11 +48,12 @@ export default function(Ey) {
     }
 
     async function index(r) {
-      if (r.headers.accept.indexOf('text/html') === 0)
-        return tryHtml(r)
-
-      if (r.headers.accept === '*/*')
-        return tryJs(r)
+      if (r.headers.accept) {
+        if (r.headers.accept.indexOf('text/html') === 0)
+          return tryHtml(r)
+        else if (r.headers.accept === '*/*')
+          return tryJs(r)
+      }
     }
 
     function tryJs(r) {
