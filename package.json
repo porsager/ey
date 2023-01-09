@@ -10,6 +10,9 @@
   "scripts": {
     "test": "echo some day"
   },
+  "bin": {
+    "ey": "./bin/index.js"
+  },
   "files": [
     "/src"
   ],
