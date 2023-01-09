@@ -14,7 +14,8 @@
     "ey": "./bin/index.js"
   },
   "files": [
-    "/src"
+    "/src",
+    "/bin"
   ],
   "keywords": [
     "uws",
