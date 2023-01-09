@@ -1,8 +1,6 @@
 import path             from 'node:path'
-import fsp              from 'node:fs/promises'
 
 const rewrites = new Map()
-const redirects = new Map()
 const trimSlash = x => x.charCodeAt(x.length - 1) === 47 ? x.slice(0, -1) : x
 const notFound = x => x.code === 'ENOENT' || x.code === 'EISDIR'
 
@@ -15,7 +13,6 @@ export default function(Ey) {
 
     const {
       rewrite = true,
-      redirect = true,
       ...options
     } = o || {}
 
@@ -28,12 +25,8 @@ export default function(Ey) {
     function cache(r) {
       const url = trimSlash(r.pathname)
 
-      if (r.headers.accept) {
-        if (rewrite && r.headers.accept.indexOf('text/html') === 0 && rewrites.has(url))
-          return r.url = rewrites.get(url)
-        else if (redirect && r.headers.accept === '*/*' && redirects.has(url))
-          return r.end(...redirects.get(url))
-      }
+      if (rewrite && r.headers.accept && r.headers.accept.indexOf('text/html') === 0 && rewrites.has(url))
+        return r.url = rewrites.get(url)
     }
 
     async function file(r) {
@@ -48,29 +41,8 @@ export default function(Ey) {
     }
 
     async function index(r) {
-      if (r.headers.accept) {
-        if (r.headers.accept.indexOf('text/html') === 0)
-          return tryHtml(r)
-        else if (r.headers.accept === '*/*')
-          return tryJs(r)
-      }
-    }
-
-    function tryJs(r) {
-      return fsp
-        .stat(resolve(path.join(r.url, 'index.js')))
-        .then(x => x.isFile() && trimSlash(r.pathname) + '/index.js')
-        .catch(() => null)
-        .then(x => x || fsp.stat(resolve(r.url + '.js')).then(x => x.isFile() && r.pathname + '.js'))
-        .catch(() => null)
-        .then(Location => {
-          if (!Location)
-            return
-
-          const response = [302, { Location }]
-          redirect && redirects.set(trimSlash(r.pathname), response)
-          return r.end(...response)
-        })
+      if (r.headers.accept && r.headers.accept.indexOf('text/html') === 0)
+        return tryHtml(r)
     }
 
     async function tryHtml(r) {
