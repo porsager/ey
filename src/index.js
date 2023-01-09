@@ -37,6 +37,7 @@ export default function ey({
   router.missingServerName = (...xs) => (uws ? uws.missingServerName(...xs) : msn.add(xs), router)
   router.removeServerName = (...xs) => (uws ? uws.removeServerName(...xs) : rsn.add(xs), router)
   router.unlisten = () => listener && uWS.us_listen_socket_close(listener)
+  router.close = () => uws && uws.close()
 
   return router
 
