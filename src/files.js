@@ -40,7 +40,7 @@ export default function(Ey) {
       }
     }
 
-    async function index(r) {
+    function index(r) {
       if (r.headers.accept && r.headers.accept.indexOf('text/html') === 0)
         return tryHtml(r)
     }

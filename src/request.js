@@ -180,7 +180,7 @@ export default class Request {
       },
       destroy(error, callback) {
         callback(error)
-        r.close()
+        r.end()
       },
       final(callback) {
         r.end()
@@ -254,7 +254,9 @@ export default class Request {
     typeof body === 'number' && (headers = status, status = body, body = undefined)
     typeof status === 'object' && (headers = status, status = undefined)
     return this.head(status || 200, headers, () => {
-      this[$.res].end(body || '')
+      this.method === 'head'
+        ? this[$.res].endWithoutBody()
+        : this[$.res].end(body || '')
       this.ended = true
     })
   }
@@ -350,7 +352,6 @@ export default class Request {
   }
 }
 
-
 async function read(r, file, type, compressor, o) {
   let handle
 
@@ -363,6 +364,21 @@ async function read(r, file, type, compressor, o) {
 
     if (stat.size >= o.minStreamSize)
       return stream(r, file, type, { handle, stat, compressor }, o)
+
+    const headers = {
+      ETag: createEtag(stat.mtime, stat.size, compressor),
+      'Last-Modified': stat.mtime.toUTCString(),
+      'Content-Encoding': compressor,
+      'Content-Type': type
+    }
+
+    if (r.method === 'head') {
+      r.end(200, {
+        ...headers,
+        [compressor ? 'Transfer-Encoding' : 'Content-Length']: compressor ? 'chunked' : stat.size
+      })
+      return handle.close()
+    }
 
     let bytes = await handle.readFile()
 
@@ -377,12 +393,7 @@ async function read(r, file, type, compressor, o) {
     if (compressor)
       bytes = await compressors[compressor](bytes)
 
-    const response = [bytes, {
-      ETag: createEtag(stat.mtime, bytes.length, compressor),
-      'Last-Modified': stat.mtime.toUTCString(),
-      'Content-Encoding': compressor,
-      'Content-Type': type
-    }]
+    const response = [bytes, headers]
 
     o.cache && stat.size < o.maxCacheSize && caches[compressor || 'identity'].set(file, response)
     return r.end(...response)
@@ -415,9 +426,7 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
         , total = end - start + 1
 
     if (end >= size) {
-      r.end('Range Not Satisfiable', 416, {
-        'Content-Range': 'bytes */' + (size - 1)
-      })
+      r.end('Range Not Satisfiable', 416, { 'Content-Range': 'bytes */' + (size - 1) })
       return cleanup()
     }
 
@@ -430,7 +439,8 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
     stream.on('error', x => reject(x))
     stream.on('data', compressor ? writeData : tryData)
 
-    r.head(range ? 206 : 200, {
+    const status = range ? 206 : 200
+    const headers = {
       'Accept-Ranges': range ? undefined : 'bytes',
       'Last-Modified': mtime.toUTCString(),
       'Content-Encoding': compressor,
@@ -438,7 +448,17 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
       'Content-Type': type,
       Connection: 'keep-alive', // really ? needed ?
       ETag: createEtag(mtime, size, compressor)
-    })
+    }
+
+    if (r.method === 'head') {
+      r.end(status, {
+        ...headers,
+        [compressor ? 'Transfer-Encoding' : 'Content-Length']: [compressor ? 'chunked' : size]
+      })
+      return cleanup()
+    }
+
+    r.head(status, headers)
 
     let lastOffset
       , ab
