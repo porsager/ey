@@ -12,7 +12,7 @@ export default function ey({
   ...o
 } = {}) {
   let uws
-    , listener
+    , listening
 
   const handlers = new Map()
       , connects = new Set()
@@ -36,7 +36,6 @@ export default function ey({
   router.addServerName = (...xs) => (uws ? uws.addServerName(...xs) : asn.add(xs), router)
   router.missingServerName = (...xs) => (uws ? uws.missingServerName(...xs) : msn.add(xs), router)
   router.removeServerName = (...xs) => (uws ? uws.removeServerName(...xs) : rsn.add(xs), router)
-  router.unlisten = () => listener && uWS.us_listen_socket_close(listener)
   router.close = () => uws && uws.close()
 
   return router
@@ -79,24 +78,28 @@ export default function ey({
         break
     }
 
-    return listener && !r.handled && ( // Ensure we only use default in listening router
+    return listening && !r.handled && ( // Ensure we only use default in listening router
       hasOwn.call(r, $.error)
         ? (r.end(STATUS_CODES[500], 500), console.error('Uncaught route error', r[$.error]))
         : r.end(STATUS_CODES[404], 404)
     )
   }
 
-  function listen({ cert, key, ...options }) {
-    return (port, options) => {
+  function listen(defaultOptions) {
+    return (port, address, options) => {
       return new Promise((resolve, reject) => {
         let address
+          , listener
+
+        typeof address === 'object' && (options = address, address = null)
+        const o = {
+          ...defaultOptions,
+          ...(options || {})
+        }
 
         port = parseInt(port)
-        typeof options === 'string' && (address = options, options = null)
-
-        router.unlisten()
-        uws = cert
-          ? uWS.SSLApp({ cert_file_name: cert, key_file_name: key, ...o, ...options })
+        uws = o.cert
+          ? uWS.SSLApp({ cert_file_name: o.cert, key_file_name: o.key, o })
           : uWS.App()
         asn.forEach(xs => uws.addServerName(...xs))
         msn.forEach(xs => uws.missingServerName(...xs))
@@ -107,16 +110,18 @@ export default function ey({
 
         address
           ? uws.listen(address, port, callback)
-          : options
-          ? uws.listen(port, options, callback)
-          : uws.listen(port, callback)
+          : uws.listen(port, o, callback)
 
         function callback(handle) {
           if (!handle)
             return reject(new Error('Could not listen on', port))
 
-          listener = handle
-          resolve({ port: uWS.us_socket_local_port(handle), handle })
+          listening = true
+          resolve({ port: uWS.us_socket_local_port(handle), handle, unlisten })
+        }
+
+        function unlisten() {
+          listener && uWS.us_listen_socket_close(listener)
         }
       })
     }
