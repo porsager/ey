@@ -291,7 +291,7 @@ function upgrader(pattern, options) {
     r[$.read](options)
     let x = options.upgrade(r)
     x && typeof x.then === 'function' && (res.onAborted(), x = await x)
-    if (x.aborted || x.handled)
+    if (r.aborted || r.handled)
       return
 
     r[$.headers] && r.head(101)
