@@ -7,6 +7,16 @@ import mimes from './mimes.js'
 
 import uWS from 'uWebSockets.js'
 
+class Message {
+  constructor(data, binary) {
+    this.data = data
+    this.binary = binary
+  }
+  get buffer() { return Buffer.from(this.data) }
+  get json() { return tryJSON(this.data) }
+  get text() { return Buffer.from(this.data).toString() }
+}
+
 export default function ey({
   methods = ['head', 'get', 'put', 'post', 'delete', 'patch', 'options', 'trace', 'all'],
   ...o
@@ -127,31 +137,14 @@ export default function ey({
     }
   }
 
-  function ws(pattern, options, fn) {
-    typeof pattern !== 'string' && (fn = options, options = pattern, pattern = '/*')
-    typeof options === 'function' && (fn = options, options = {})
-
+  function ws(pattern, options) {
+    typeof pattern !== 'string' && (options = pattern, pattern = '/*')
     wss.add([
       pattern,
       {
-        open: ws => {
-          ws[Symbol.asyncIterator] = () => ({
-            next: () => new Promise(r => ws[$.resolve] = r)
-          })
-          fn(ws)
-        },
-        close: ws => hasOwn.call(ws, $.resolve) && ws[$.resolve]({ done: true }),
-        message: (ws, data, binary) => ws[$.resolve]({
-          value: {
-            data,
-            binary,
-            get buffer() { return Buffer.from(data) },
-            get json() { return tryJSON(data) },
-            get text() { return Buffer.from(data).toString() }
-          }
-        }),
         ...options,
-        ...(options.upgrade ? { upgrade: upgrader(pattern, options) } : {})
+        ...(options.upgrade ? { upgrade: upgrader(pattern, options) } : {}),
+        message: (ws, data, binary) => options.message(ws, new Message(data, binary))
       }
     ])
   }
