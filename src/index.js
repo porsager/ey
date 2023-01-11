@@ -80,6 +80,7 @@ export default function ey({
           r.onAborted()
           r.last = await result
         }
+        r[$.reading] && await r[$.reading]
       } catch (error) {
         r[$.error] = error
       }

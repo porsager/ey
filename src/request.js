@@ -42,9 +42,11 @@ export default class Request {
     this.pathname = this.url
     this.params = {}
     this.headers = {}
+    this.reading = false
     this.handled = false
     this.aborted = false
     this.ended = false
+    this.paused = false
     this.last = undefined
     this[$.res] = res
     this[$.req] = req
@@ -56,11 +58,13 @@ export default class Request {
   }
 
   [Symbol.asyncIterator]() {
-    let resolve
+    let finalResolve
+      , resolve
       , reject
       , done
 
     this.onAborted(() => reject(new Error('Aborted')))
+    this[$.reading] = new Promise(r => finalResolve = r).then(() => this.reading = false)
     this[$.res].onData((data, isLast) => {
       resolve({
         value: {
@@ -69,10 +73,14 @@ export default class Request {
           get text() { return Buffer.from(data).toString() }
         }
       })
+
       isLast && (done = { done: true })
     })
     return {
-      next: () => done || new Promise((r, e) => (resolve = r, reject = e))
+      next: () => done
+        ? (setImmediate(finalResolve), done)
+        : new Promise((r, e) => (resolve = r, reject = e)),
+      return: finalResolve
     }
   }
 
@@ -147,7 +155,9 @@ export default class Request {
       return r[$.readable]
 
     const stream = r[$.readable] = new Stream.Readable({
-      read() { r.resume() }
+      read(size) {
+        r.resume()
+      }
     })
 
     start()
@@ -157,8 +167,7 @@ export default class Request {
     async function start() {
       try {
         for await (const { buffer } of r)
-          stream.push(buffer) || r[$.res].pause()
-
+          stream.push(buffer) || r.pause()
         stream.push(null)
       } catch (error) {
         stream.destroy(error)
@@ -195,11 +204,17 @@ export default class Request {
   }
 
   resume() {
-    return this.handled || this.aborted || this[$.res].resume()
+    if (!this.paused || this.handled || this.aborted)
+      return
+    this.paused = false
+    this[$.res].resume()
   }
 
   pause() {
-    return this.handled || this.aborted || this[$.res].pause()
+    if (this.paused || this.handled || this.aborted)
+      return
+    this.paused = true
+    this[$.res].pause()
   }
 
   cookie(name, value, options) {

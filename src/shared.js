@@ -11,6 +11,7 @@ export const symbols = {
   query: Symbol('query'),
   headers: Symbol('headers'),
   options: Symbol('options'),
+  reading: Symbol('reading'),
   readable: Symbol('readable'),
   writable: Symbol('writable'),
   headersRead: Symbol('headers')
