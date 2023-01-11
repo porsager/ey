@@ -73,27 +73,34 @@ export default function ey({
       if (!match)
         continue
 
-      try {
-        r[$.req] && r[$.read](x.options)
-        let result = x.handler({ error: r[$.error], r, match })
-        if (result && typeof result.then === 'function') {
-          r.onAborted()
-          r.last = await result
-        }
-        r[$.reading] && await r[$.reading]
-      } catch (error) {
-        r[$.error] = error
-      }
+      await tryHandler(x, r, match)
 
       if (r.handled)
         break
     }
 
-    return listening && !r.handled && ( // Ensure we only use default in listening router
-      hasOwn.call(r, $.error)
-        ? (r.end(STATUS_CODES[500], 500), console.error('Uncaught route error', r[$.error]))
-        : r.end(STATUS_CODES[404], 404)
-    )
+    if (!listening || r.handled) // Ensure we only use default in listening router
+      return
+
+    hasOwn.call(r, $.error)
+      ? r[$.error] instanceof URIError
+        ? (r.end('Bad URI', 400), console.error(400, r.url, '->', r[$.error]))
+        : (r.end(STATUS_CODES[500], 500), console.error(500, 'Uncaught route error', r[$.error]))
+      : r.end(STATUS_CODES[404], 404)
+  }
+
+  async function tryHandler(x, r, match) {
+    try {
+      r[$.req] && r[$.read](x.options)
+      let result = x.handler({ error: r[$.error], r, match })
+      if (result && typeof result.then === 'function') {
+        r.onAborted()
+        r.last = await result
+      }
+      r[$.reading] && await r[$.reading]
+    } catch (error) {
+      r[$.error] = error
+    }
   }
 
   function listen(defaultOptions) {

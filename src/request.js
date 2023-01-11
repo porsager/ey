@@ -38,7 +38,12 @@ const caches = {
 export default class Request {
   constructor(res, req, options = {}) {
     this.method = req.getMethod()
-    this.url = decodeURIComponent(req.getUrl())
+    try {
+      this.url = decodeURIComponent(req.getUrl())
+    } catch (error) {
+      this.url = req.getUrl()
+      this[$.error] = error
+    }
     this.pathname = this.url
     this.params = {}
     this.headers = {}
