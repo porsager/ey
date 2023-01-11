@@ -299,7 +299,6 @@ export default class Request {
 
   write(...xs) {
     this.handled = true
-    this.write = this[$.res].write
     return this.aborted || this[$.res].write(...xs)
   }
 
