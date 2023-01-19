@@ -372,6 +372,7 @@ export default class Request {
 }
 
 async function read(r, file, type, compressor, o) {
+  r.onAborted()
   let handle
 
   try {
@@ -423,6 +424,7 @@ async function read(r, file, type, compressor, o) {
 }
 
 async function stream(r, file, type, { handle, stat, compressor }, options) {
+  r.onAborted()
   let stream
     , resolve
     , reject
