@@ -312,9 +312,14 @@ export default class Request {
 
   tryEnd(...xs) {
     this.handled = true
-    return this.aborted
-      ? [true, true]
-      : this[$.res].tryEnd(...xs)
+    if (this.aborted)
+      return [true, true]
+
+    try {
+      return this[$.res].tryEnd(...xs)
+    } catch (err) {
+      return [true, true]
+    }
   }
 
   write(...xs) {
