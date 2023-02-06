@@ -281,6 +281,7 @@ export default new Map([
   ['mxf', 'application/mxf'],
   ['mxmf', 'audio/mobile-xmf'],
   ['mxml', 'application/xv+xml'],
+  ['msg', 'application/vnd.ms-outlook'],
   ['n3', 'text/n3'],
   ['nb', 'application/mathematica'],
   ['nq', 'application/n-quads'],
