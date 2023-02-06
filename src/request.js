@@ -173,6 +173,7 @@ export default class Request {
       try {
         for await (const { buffer } of r)
           stream.push(buffer) || r.pause()
+        r.resume()
         stream.push(null)
       } catch (error) {
         stream.destroy(error)
