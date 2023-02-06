@@ -1,3 +1,5 @@
+import uWS from 'uWebSockets.js'
+
 import fsp              from 'node:fs/promises'
 import zlib             from 'node:zlib'
 import { promisify }    from 'node:util'
@@ -118,6 +120,8 @@ export default class Request {
       ? JSON.parse(full)
       : type === 'text'
       ? full.toString()
+      : type === 'multipart'
+      ? uWS.getParts(full, this.headers['content-type'])
       : full
   }
 
