@@ -222,7 +222,7 @@ export default class Request {
     this[$.res].pause()
   }
 
-  cookie(name, value, options) {
+  cookie(name, value, options = {}) {
     if (arguments.length === 1)
       return getCookie(name, this.headers.cookie)
 
