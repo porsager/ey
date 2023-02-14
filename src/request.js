@@ -64,31 +64,30 @@ export default class Request {
     this[$.headersRead] = undefined
   }
 
-  [Symbol.asyncIterator]() {
-    let finalResolve
-      , resolve
-      , reject
-      , done
+  async onData(fn) {
+    this[$.onData] = fn
 
-    this.onAborted(() => reject(new Error('Aborted')))
-    this[$.reading] = new Promise(r => finalResolve = r).then(() => this.reading = false)
-    this[$.res].onData((data, isLast) => {
-      resolve({
-        value: {
-          data,
-          get buffer() { return Buffer.from(Buffer.from(data)) },
-          get text() { return Buffer.from(data).toString() }
-        }
-      })
-
-      isLast && (done = { done: true })
-    })
-    return {
-      next: () => done
-        ? (setImmediate(finalResolve), done)
-        : new Promise((r, e) => (resolve = r, reject = e)),
-      return: finalResolve
+    if (this[$.data]) {
+      this[$.data].forEach(x => fn(x))
+      this[$.data] = undefined
     }
+
+    return this[$.readBody](false)
+  }
+
+  [$.readBody](buffer) {
+    if (this[$.reading])
+      return this[$.reading]
+
+    buffer && (this[$.data] = [])
+    return this[$.reading] = new Promise((resolve, reject) => {
+      this[$.res].onData((data, isLast) => {
+        this[$.onData]
+          ? this[$.onData](Buffer.from(data), isLast)
+          : this[$.data].push(Buffer.from(Buffer.from(data)))
+        isLast && resolve()
+      })
+    })
   }
 
   async body(type) {
@@ -104,12 +103,12 @@ export default class Request {
 
     let offset = 0
 
-    for await (const { buffer } of this) {
+    await this.onData(buffer => {
       known
         ? buffer.copy(full, offset)
         : full.push(buffer)
       offset += buffer.length
-    }
+    })
 
     known || (full = Buffer.concat(full))
 
@@ -160,11 +159,11 @@ export default class Request {
 
   get readable() {
     const r = this // eslint-disable-line
-    if (hasOwn.call(r, $.readable))
-      return r[$.readable]
+    if (hasOwn.call(r, $.readStream))
+      return r[$.readStream]
 
-    const stream = r[$.readable] = new Stream.Readable({
-      read(size) {
+    const stream = r[$.readStream] = new Stream.Readable({
+      read() {
         r.resume()
       }
     })
@@ -175,8 +174,9 @@ export default class Request {
 
     async function start() {
       try {
-        for await (const { buffer } of r)
-          stream.push(buffer) || r.pause()
+        await r.onData(buffer =>
+          stream.push(r[$.data] ? buffer : Buffer.from(buffer)) || r.pause()
+        )
         r.resume()
         stream.push(null)
       } catch (error) {
@@ -245,7 +245,7 @@ export default class Request {
     )
   }
 
-  [$.read](options = {}) {
+  [$.readHeaders](options = {}) {
     if (!this[$.req] || this[$.headersRead])
       return
 

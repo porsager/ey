@@ -5,14 +5,18 @@ export const symbols = {
   req: Symbol('req'),
   res: Symbol('res'),
   body: Symbol('body'),
-  read: Symbol('read'),
+  data: Symbol('data'),
   abort: Symbol('abort'),
   error: Symbol('error'),
   query: Symbol('query'),
+  onData: Symbol('onData'),
   headers: Symbol('headers'),
   options: Symbol('options'),
   reading: Symbol('reading'),
   readable: Symbol('readable'),
   writable: Symbol('writable'),
-  headersRead: Symbol('headers')
+  readBody: Symbol('readBody'),
+  headersRead: Symbol('headers'),
+  readStream: Symbol('readStream'),
+  readHeaders: Symbol('readHeaders')
 }

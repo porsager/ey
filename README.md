@@ -80,9 +80,9 @@ Implement middleware with `all`. Ey forwards the request to the next handler, un
 
 ```javascript
 app.all((r, next) => {
-    r.headers.authorization
-      ? r.token = r.headers.authorization.split(' ')[1]
-      : r.end(401) // request ends here
+  r.headers.authorization
+    ? r.token = r.headers.authorization.split(' ')[1]
+    : r.end(401) // request ends here
 })
 
 app.all(r => {
@@ -101,9 +101,9 @@ You can specify which headers a route will use, up front, to prevent reading and
 const app = ey({ headers: ['content-type'] })
 
 app.get('/login', { headers: ['authorization'] }, r => {
-    r.headers['content-type'] // string
-    r.headers['authorization'] // string
-    r.headers['accept'] // undefined    
+  r.headers['content-type'] // string
+  r.headers['authorization'] // string
+  r.headers['accept'] // undefined    
 })
 ```
 
@@ -113,8 +113,8 @@ Any middleware that accepts 2 arguments will be registrered as an error handler 
 
 ```javascript
 app.all((error, r) => {
-    connected = true
-    res.end(await ...)
+  connected = true
+  res.end(await ...)
 })
 ```
 
@@ -154,7 +154,7 @@ Routes are matched according to the order in which they are defined. This is imp
 ```javascript
 // GET /u25
 app.get('/:id', r => 
-    r.params.id // The actual id value
+  r.params.id // The actual id value
 )
 ```
 
@@ -162,7 +162,7 @@ app.get('/:id', r =>
 ```javascript
 // GET /?sort=-price
 app.get(r => {
-    req.query.sort // -price
+  req.query.sort // -price
 })
 ```
 
@@ -172,10 +172,10 @@ app.get(r => {
 ```javascript
 // POST /user { name: 'Murray' }
 app.post('/user', async r => {
-    const body = await r.body('json')
-        , user = await sql`insert into users ${ sql(body) }`
-        
-    r.json(user, 201) // r.json sets Content-Type: application/json header
+  const body = await r.body('json')
+      , user = await sql`insert into users ${ sql(body) }`
+      
+  r.json(user, 201) // r.json sets Content-Type: application/json header
 })
 ```
 
@@ -194,13 +194,12 @@ app.all('/node_modules', r.files('/node_modules'))
 ```javascript
 // POST /file data
 app.post('/file', async r => {
-    const file = fs.createWriteStream('...')
-    
-    for await (const { buffer } of r)
-        file.write(buffer)
-    
-    file.close()
-    r.end('Done')
+  await new Promise((resolve, reject) =>
+    r.readable.pipe(fs.createWriteStream('...'))
+     .on('finish', resolve)
+     .on('error', reject)
+  )
+  r.end('Done')
 })
 ```
 
@@ -208,9 +207,9 @@ app.post('/file', async r => {
 ```javascript
 // GET /old-link
 app.get('/old-link', async r => {
-    r.end(302, {
-        location: '/new-link'
-    })
+  r.end(302, {
+    location: '/new-link'
+  })
 })
 ```
 
@@ -218,10 +217,9 @@ app.get('/old-link', async r => {
 
 ```javascript
 app.all(r => {
-    const session = await sql`select * from sessions where key = ${ 
-        r.headers.authorization.split(' ')[0] 
-    }`
-    
+  const session = await sql`select * from sessions where key = ${ 
+    r.headers.authorization.split(' ')[0] 
+  }`  
 })
 ```
 

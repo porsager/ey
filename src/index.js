@@ -92,9 +92,10 @@ export default function ey({
 
   async function tryHandler(x, r, match) {
     try {
-      r[$.req] && r[$.read](x.options)
+      r[$.req] && r[$.readHeaders](x.options)
       let result = x.handler({ error: r[$.error], r, match })
       if (result && typeof result.then === 'function') {
+        r.method.charCodeAt(0) === 112 && r[$.readBody](true)
         r.onAborted()
         r.last = await result
       }
@@ -291,7 +292,7 @@ function upgrader(pattern, options) {
   return async function(res, req, context) {
     const r = new Request(res, req, options)
     ;(pattern.match(/\/:([^/]+|$)/g) || []).map((x, i) => r.params[x.slice(2)] = res.getParameter(i))
-    r[$.read](options)
+    r[$.readHeaders](options)
     let x = options.upgrade(r)
     x && typeof x.then === 'function' && (res.onAborted(), x = await x)
     if (r.aborted || r.handled)
