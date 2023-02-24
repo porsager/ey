@@ -129,6 +129,7 @@ export default class Request {
     if (!this[$.req])
       return
 
+    this.ip // ensure IP is read on first tick
     this[$.req] = null
     return this[$.res].onAborted(() => {
       this.aborted = true
