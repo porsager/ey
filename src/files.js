@@ -34,7 +34,7 @@ export default function(Ey) {
         await r.file(resolve(r.url), options)
       } catch (error) {
         if (notFound(error))
-          return
+          return r.handled =  false
 
         throw error
       }

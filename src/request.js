@@ -354,6 +354,7 @@ export default class Request {
   }
 
   file(file, options) {
+    this.handled = true
     options = Object.assign({
       lastModified: true,
       etag: true,
