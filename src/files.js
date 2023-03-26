@@ -1,4 +1,4 @@
-import path             from 'node:path'
+import path from 'node:path'
 
 const rewrites = new Map()
 const trimSlash = x => x.charCodeAt(x.length - 1) === 47 ? x.slice(0, -1) : x

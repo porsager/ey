@@ -390,6 +390,7 @@ async function read(r, file, type, compressor, o) {
   try {
     handle = await fsp.open(file, 'r')
     const stat = await handle.stat()
+    r.handled = false
 
     if (stat.size < o.minCompressSize)
       compressor = null
@@ -430,6 +431,7 @@ async function read(r, file, type, compressor, o) {
     o.cache && stat.size < o.maxCacheSize && caches[compressor || 'identity'].set(file, response)
     return r.end(...response)
   } catch (error) {
+    r.handled = r.ended
     handle && handle.close()
     throw error
   }
@@ -447,6 +449,7 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
     handle || (handle = await fsp.open(file, 'r'))
     const { size, mtime } = stat || (await handle.stat())
 
+    r.handled = false
     if (r.aborted)
       return cleanup()
 
