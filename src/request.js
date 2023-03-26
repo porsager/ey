@@ -365,7 +365,7 @@ export default class Request {
     }, options)
 
     file = path.isAbsolute(file) ? file : path.join(cwd, file)
-    const compressions = options.compressions || this[$.options].compressions
+    const compressions = options.compressions ?? this[$.options].compressions
         , cache = options.cache || this[$.options].cache
         , ext = path.extname(file).slice(1)
         , type = mimes.get(ext)
