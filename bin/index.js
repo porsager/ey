@@ -17,15 +17,17 @@ const argv = process.argv.slice(2)
 
 const options = {
   secure: process.env.SSL_CERT,
-  cache: false || !!argv.find(x => x === '--cache'),
-  compressions: argv.find(x => x === '--no-compress') ? [] : undefined
+  cache: false || !!argv.find(x => x === '--cache')
 }
+
+argv.find(x => x === '--no-compress') && (options.compressions = [])
 
 if (supportsThreads && isMainThread) {
   for (let i = 0; i < cpus; i++)
     new Worker(new URL(import.meta.url), { argv }) // eslint-disable-line
 } else {
   const app = ey(options)
+  app.get(app.files('./wat', options))
   app.get(app.files(abs, options))
   try {
     const x = await app.listen(port)
