@@ -377,9 +377,12 @@ export default class Request {
       ? getEncoding(this.headers['accept-encoding'], compressions, type)
       : null
 
-    return cache && caches[compressor || 'identity'].has(file)
-      ? this.end(...caches[compressor || 'identity'].get(file))
-      : read(this, file, type, compressor, options)
+    if (cache && caches[compressor || 'identity'].has(file)) {
+      this.handled = false
+      this.end(...caches[compressor || 'identity'].get(file))
+    }
+
+    return read(this, file, type, compressor, options)
   }
 }
 
