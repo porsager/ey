@@ -58,7 +58,7 @@ export default class Request {
     this[$.res] = res
     this[$.req] = req
     this[$.options] = options
-    this[$.query] = req.getQuery()
+    this[$.query] = req.getQuery() || ''
     this[$.abort] = undefined
     this[$.headers] = undefined
     this[$.headersRead] = undefined
