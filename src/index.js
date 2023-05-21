@@ -74,7 +74,18 @@ export default function ey({
       if (!match)
         continue
 
-      await tryHandler(x, r, match)
+      try {
+        r[$.req] && r[$.readHeaders](x.options)
+        r.last = x.handler({ error: r[$.error], r, match })
+        if (r.last && typeof r.last.then === 'function') {
+          r.method.charCodeAt(0) === 112 && r[$.readBody](true)
+          r.onAborted()
+          r.last = await r.last
+        }
+        r[$.reading] && (r.onAborted(), await r[$.reading])
+      } catch (error) {
+        r[$.error] = error
+      }
 
       if (r.handled)
         break
@@ -88,21 +99,6 @@ export default function ey({
         ? (r.end('Bad URI', 400), console.error(400, r.url, '->', r[$.error]))
         : (r.end(STATUS_CODES[500], 500), console.error(500, 'Uncaught route error', r[$.error]))
       : r.end(STATUS_CODES[404], 404)
-  }
-
-  async function tryHandler(x, r, match) {
-    try {
-      r[$.req] && r[$.readHeaders](x.options)
-      let result = x.handler({ error: r[$.error], r, match })
-      if (result && typeof result.then === 'function') {
-        r.method.charCodeAt(0) === 112 && r[$.readBody](true)
-        r.onAborted()
-        r.last = await result
-      }
-      r[$.reading] && await r[$.reading]
-    } catch (error) {
-      r[$.error] = error
-    }
   }
 
   function listen(defaultOptions) {
@@ -155,9 +151,30 @@ export default function ey({
       {
         ...options,
         ...(options.upgrade ? { upgrade: upgrader(pattern, options) } : {}),
-        message: (ws, data, binary) => options.message(ws, new Message(data, binary))
+        open: catcher('open', options, (fn, ...ws) => fn(...ws)),
+        message: catcher('message', options, (fn, ws, data, binary) => fn(ws, new Message(data, binary))),
+        subscription: catcher('subscription', options, (fn, ...ws) => fn(...ws)),
+        drain: catcher('drain', options, (fn, ...ws) => fn(...ws)),
+        ping: catcher('ping', options, (fn, ...ws) => fn(...ws)),
+        pong: catcher('pong', options, (fn, ...ws) => fn(...ws)),
+        close: catcher('close', options, (fn, ...ws) => fn(...ws))
       }
     ])
+  }
+
+  function catcher(name, options, fn) {
+    if (!(name in options))
+      return
+
+    const method = options[name]
+    return function(ws, ...xs) {
+      try {
+        fn(method, ws, ...xs)
+      } catch (error) {
+        ws.end(1011, 'Internal Server Error')
+        console.error(500, 'Uncaught ' + name + ' error', error)
+      }
+    }
   }
 
   function register(name) {
@@ -293,14 +310,25 @@ function upgrader(pattern, options) {
     const r = new Request(res, req, options)
     ;(pattern.match(/\/:([^/]+|$)/g) || []).map((x, i) => r.params[x.slice(2)] = res.getParameter(i))
     r[$.readHeaders](options)
-    let x = options.upgrade(r)
-    x && typeof x.then === 'function' && (res.onAborted(), x = await x)
+    let error
+      , data
+    try {
+      data = options.upgrade(r)
+      data && typeof data.then === 'function' && (res.onAborted(), data = await data)
+    } catch (err) {
+      error = err
+      console.error(500, 'Uncaught upgrade error', error)
+    }
+
     if (r.aborted || r.handled)
       return
 
+    if (error)
+      return r.end(STATUS_CODES[500], 500)
+
     r[$.headers] && r.head(101)
     res.upgrade(
-      x || {},
+      data || {},
       r.headers['sec-websocket-key'],
       r.headers['sec-websocket-protocol'],
       r.headers['sec-websocket-extensions'],
