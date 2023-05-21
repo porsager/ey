@@ -456,7 +456,7 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
     r.onAborted(cleanup)
 
     const range = r.headers.range || ''
-        , highWaterMark = options.highWaterMark
+        , highWaterMark = options.highWaterMark || options.minStreamSize
         , end = parseInt(range.slice(range.indexOf('-') + 1)) || size - 1
         , start = parseInt(range.slice(6, range.indexOf('-')) || size - end - 1)
         , total = end - start + 1
