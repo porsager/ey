@@ -29,6 +29,6 @@
     "zerodeps"
   ],
   "dependencies": {
-    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.20.0"
+    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.25.0"
   }
 }
