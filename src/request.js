@@ -155,7 +155,7 @@ export default class Request {
       : Buffer.compare(ipv4, remoteIP.slice(0, 12)) === 0
         ? [...remoteIP.slice(12)].join('.')
         : Buffer.from(this[$.res].getRemoteAddressAsText()).toString()
-    ).replace(/(^|:)0+/g, '$1').replace(/::/g, '').replace(':1', '::1')
+    ).replace(/(^|:)0+/g, '$1').replace(/::+/g, '::')
   }
 
   get readable() {
