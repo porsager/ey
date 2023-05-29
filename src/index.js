@@ -151,18 +151,18 @@ export default function ey({
       {
         ...options,
         ...(options.upgrade ? { upgrade: upgrader(pattern, options) } : {}),
-        open: catcher('open', options, (fn, ...ws) => fn(...ws)),
         message: catcher('message', options, (fn, ws, data, binary) => fn(ws, new Message(data, binary))),
-        subscription: catcher('subscription', options, (fn, ...ws) => fn(...ws)),
-        drain: catcher('drain', options, (fn, ...ws) => fn(...ws)),
-        ping: catcher('ping', options, (fn, ...ws) => fn(...ws)),
-        pong: catcher('pong', options, (fn, ...ws) => fn(...ws)),
-        close: catcher('close', options, (fn, ...ws) => fn(...ws))
+        open: catcher('open', options),
+        subscription: catcher('subscription', options),
+        drain: catcher('drain', options),
+        ping: catcher('ping', options),
+        pong: catcher('pong', options),
+        close: catcher('close', options)
       }
     ])
   }
 
-  function catcher(name, options, fn) {
+  function catcher(name, options, fn = (fn, ...ws) => fn(...ws)) {
     if (!(name in options))
       return
 
