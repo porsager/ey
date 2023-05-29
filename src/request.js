@@ -301,46 +301,46 @@ export default class Request {
     return this
   }
 
-  cork(...xs) {
+  cork(fn) {
     this.handled = true
-    this.aborted || this[$.res].cork(xs[0])
+    this.aborted || this[$.res].cork(fn)
     return this
   }
 
-  getWriteOffset(...xs) {
-    return this.aborted || this[$.res].getWriteOffset(...xs)
+  getWriteOffset() {
+    return this.aborted || this[$.res].getWriteOffset()
   }
 
-  onWritable(...xs) {
+  onWritable(fn) {
     this.handled = true
-    return this[$.res].onWritable(...xs)
+    return this[$.res].onWritable(fn)
   }
 
-  tryEnd(...xs) {
+  tryEnd(x, total) {
     this.handled = true
     if (this.aborted)
       return [true, true]
 
     try {
-      return this[$.res].tryEnd(...xs)
+      return this[$.res].tryEnd(x, total)
     } catch (err) {
       return [true, true]
     }
   }
 
-  write(...xs) {
+  write(x) {
     this.handled = true
-    return this.aborted || this[$.res].write(...xs)
+    return this.aborted || this[$.res].write(x)
   }
 
-  writeHeader(...xs) {
+  writeHeader(k, v) {
     this.handled = true
-    return this.aborted || this[$.res].writeHeader(...xs)
+    return this.aborted || this[$.res].writeHeader(k, v)
   }
 
-  writeStatus(...xs) {
+  writeStatus(x) {
     this.handled = true
-    return this.aborted || this[$.res].writeStatus(...xs)
+    return this.aborted || this[$.res].writeStatus(x)
   }
 
   json(body, ...xs) {
@@ -429,7 +429,7 @@ async function read(r, file, type, compressor, o) {
     const response = [bytes, headers]
 
     o.cache && stat.size < o.maxCacheSize && caches[compressor || 'identity'].set(file, response)
-    return r.end(...response)
+    return r.end(bytes, headers)
   } catch (error) {
     r.handled = r.ended
     handle && handle.close()
@@ -487,10 +487,10 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
     }
 
     if (r.method === 'head') {
-      r.end(status, {
-        ...headers,
-        [compressor ? 'Transfer-Encoding' : 'Content-Length']: [compressor ? 'chunked' : size]
-      })
+      compressor
+        ? headers['Transfer-Encoding'] = 'chunked'
+        : headers['Content-Length'] = size
+      r.end(status, headers)
       return cleanup()
     }
 
