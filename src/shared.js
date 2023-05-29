@@ -17,6 +17,5 @@ export const symbols = {
   writable: Symbol('writable'),
   readBody: Symbol('readBody'),
   headersRead: Symbol('headers'),
-  readStream: Symbol('readStream'),
   readHeaders: Symbol('readHeaders')
 }

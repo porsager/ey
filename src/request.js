@@ -9,8 +9,7 @@ import Stream           from 'node:stream'
 
 import mimes, { compressable } from './mimes.js'
 import {
-  symbols as $,
-  hasOwn
+  symbols as $
 } from './shared.js'
 
 const cwd = process.cwd()
@@ -54,14 +53,21 @@ export default class Request {
     this.aborted = false
     this.ended = false
     this.paused = false
-    this.last = undefined
+    this.last = null
     this[$.res] = res
     this[$.req] = req
     this[$.options] = options
     this[$.query] = req.getQuery() || ''
-    this[$.abort] = undefined
-    this[$.headers] = undefined
-    this[$.headersRead] = undefined
+    this[$.readable] = null
+    this[$.writable] = null
+    this[$.abort] = null
+    this[$.headers] = null
+    this[$.headersRead] = null
+    this[$.onData] = null
+    this[$.data] = null
+    this[$.reading] = null
+    this[$.body] = null
+    this[$.ip] = null
   }
 
   async onData(fn) {
@@ -91,7 +97,7 @@ export default class Request {
   }
 
   async body(type) {
-    if (hasOwn.call(this, $.body))
+    if (this[$.body] !== null)
       return this[$.body]
 
     const length = parseInt(this.headers['content-length'] || '')
@@ -144,7 +150,7 @@ export default class Request {
   }
 
   get ip() {
-    if (hasOwn.call(this, $.ip))
+    if (this[$.ip] !== null)
       return this[$.ip]
 
     const proxyIP = this.headers['x-forwarded-for']
@@ -160,10 +166,10 @@ export default class Request {
 
   get readable() {
     const r = this // eslint-disable-line
-    if (hasOwn.call(r, $.readStream))
-      return r[$.readStream]
+    if (r[$.readable] !== null)
+      return r[$.readable]
 
-    const stream = r[$.readStream] = new Stream.Readable({
+    const stream = r[$.readable] = new Stream.Readable({
       read() {
         r.resume()
       }
@@ -188,7 +194,7 @@ export default class Request {
 
   get writable() {
     const r = this // eslint-disable-line
-    if (hasOwn.call(r, $.writable))
+    if (r[$.writable] !== null)
       return r[$.writable]
 
     const writable = r[$.writable] = new Stream.Writable({
