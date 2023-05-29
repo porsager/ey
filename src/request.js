@@ -73,9 +73,9 @@ export default class Request {
   async onData(fn) {
     this[$.onData] = fn
 
-    if (this[$.data]) {
+    if (this[$.data] !== null) {
       this[$.data].forEach(x => fn(x))
-      this[$.data] = undefined
+      this[$.data] = null
     }
 
     return this[$.readBody](false)
@@ -283,8 +283,8 @@ export default class Request {
     if (this.handled)
       return (this[$.res].end(body), this.ended = true, this)
 
-    typeof body === 'number' && (headers = status, status = body, body = undefined)
-    typeof status === 'object' && (headers = status, status = undefined)
+    typeof body === 'number' && (headers = status, status = body, body = null)
+    typeof status === 'object' && (headers = status, status = null)
     return this.head(status || 200, headers, () => {
       this.method === 'head'
         ? this[$.res].endWithoutBody()
