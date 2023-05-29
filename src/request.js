@@ -350,7 +350,7 @@ export default class Request {
 
   html(body, ...xs) {
     this.set('Content-Type', 'text/html')
-    return this.end(JSON.stringify(body), ...xs)
+    return this.end(body, ...xs)
   }
 
   file(file, options) {
