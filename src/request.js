@@ -281,7 +281,7 @@ export default class Request {
       return this
 
     if (this.handled)
-      return (this[$.res].end(body), this.ended = true, this)
+      return (this[$.res].cork(() => this[$.res].end(body)), this.ended = true, this)
 
     typeof body === 'number' && (headers = status, status = body, body = null)
     typeof status === 'object' && (headers = status, status = null)
@@ -308,9 +308,10 @@ export default class Request {
   }
 
   cork(fn) {
+    let result = this.aborted
     this.handled = true
-    this.aborted || this[$.res].cork(fn)
-    return this
+    result || this[$.res].cork(() => result = fn())
+    return result
   }
 
   getWriteOffset() {
@@ -328,25 +329,22 @@ export default class Request {
       return [true, true]
 
     try {
-      return this[$.res].tryEnd(x, total)
+      return this.cork(() => this[$.res].tryEnd(x, total))
     } catch (err) {
       return [true, true]
     }
   }
 
   write(x) {
-    this.handled = true
-    return this.aborted || this[$.res].write(x)
+    return this.cork(() => this[$.res].write(x))
   }
 
   writeHeader(k, v) {
-    this.handled = true
-    return this.aborted || this[$.res].writeHeader(k, v)
+    return this.cork(() => this[$.res].writeHeader(k, v))
   }
 
   writeStatus(x) {
-    this.handled = true
-    return this.aborted || this[$.res].writeStatus(x)
+    return this.cork(() => this[$.res].writeStatus(x))
   }
 
   json(body, ...xs) {
@@ -510,7 +508,7 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
     await promise
 
     function writeData(x) {
-      r[$.res].write(x) || stream.pause()
+      r.write(x) || stream.pause()
     }
 
     function writeResume() {
