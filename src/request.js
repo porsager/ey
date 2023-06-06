@@ -543,7 +543,7 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
   }
 
   function cleanup() {
-    r.ended || r.aborted || (r[$.res].end(), r.ended = true)
+    r.handled || r.ended || r.aborted || (r[$.res].cork(() => r[$.res].end()), r.ended = true)
     handle && handle.close()
     stream && stream.destroy()
     stream = handle = null
