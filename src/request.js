@@ -508,7 +508,6 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
     r.onWritable(compressor ? writeResume : tryResume)
 
     await promise
-    cleanup()
 
     function writeData(x) {
       r[$.res].write(x) || stream.pause()
