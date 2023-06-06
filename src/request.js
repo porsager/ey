@@ -394,7 +394,7 @@ async function read(r, file, type, compressor, o) {
   let handle
 
   try {
-    handle = await fsp.open(file, 'r')
+    handle = await fsp.open(file)
     const stat = await handle.stat()
     r.handled = false
 
@@ -452,7 +452,7 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
   const promise = new Promise((a, b) => (resolve = a, reject = b))
 
   try {
-    handle || (handle = await fsp.open(file, 'r'))
+    handle || (handle = await fsp.open(file))
     const { size, mtime } = stat || (await handle.stat())
 
     r.handled = false
