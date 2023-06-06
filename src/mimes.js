@@ -139,6 +139,7 @@ export default new Map([
   ['ez', 'application/andrew-inset'],
   ['fdt', 'application/fdt+xml'],
   ['fits', 'image/fits'],
+  ['flac', 'audio/flac'],
   ['g3', 'image/g3fax'],
   ['gbr', 'application/rpki-ghostbusters'],
   ['geojson', 'application/geo+json'],
