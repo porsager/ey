@@ -27,7 +27,6 @@ if (supportsThreads && isMainThread) {
     new Worker(new URL(import.meta.url), { argv }) // eslint-disable-line
 } else {
   const app = ey(options)
-  app.get(app.files('./wat', options))
   app.get(app.files(abs, options))
   try {
     const x = await app.listen(port)
