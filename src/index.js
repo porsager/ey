@@ -326,13 +326,14 @@ function upgrader(pattern, options) {
     if (error)
       return r.end(STATUS_CODES[500], 500)
 
-    r[$.headers] && r.head(101)
-    res.upgrade(
-      data || {},
-      r.headers['sec-websocket-key'],
-      r.headers['sec-websocket-protocol'],
-      r.headers['sec-websocket-extensions'],
-      context
+    r.head(101, {}, () =>
+      res.upgrade(
+        data || {},
+        r.headers['sec-websocket-key'],
+        r.headers['sec-websocket-protocol'],
+        r.headers['sec-websocket-extensions'],
+        context
+      )
     )
   }
 }
