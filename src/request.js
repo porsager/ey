@@ -512,13 +512,14 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
     }
 
     function writeResume() {
+      if (!stream)
+        return
       stream.resume()
       return true
     }
 
     function tryData(x) {
-      ab = x.buffer.slice(x.byteOffset, x.byteOffset + x.byteLength)
-
+      ab = x.buffer
       lastOffset = r.getWriteOffset()
       const [ok, done] = r.tryEnd(ab, total)
       done
@@ -530,7 +531,7 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
       const [ok, done] = r.tryEnd(ab.slice(offset - lastOffset), total)
       done
         ? resolve(r.ended = true)
-        : ok && stream.resume()
+        : ok && stream && stream.resume()
       return ok
     }
   } catch (error) {
@@ -540,7 +541,7 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
   }
 
   function cleanup() {
-    r.handled || r.ended || r.aborted || (r[$.res].cork(() => r[$.res].end()), r.ended = true)
+    r.ended || r.aborted || (r[$.res].cork(() => r[$.res].end()), r.ended = true)
     handle && handle.close()
     stream && stream.destroy()
     stream = handle = null
