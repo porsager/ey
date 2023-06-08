@@ -67,6 +67,9 @@ export default function ey({
     const method = handlers.has(r.method) ? handlers.get(r.method) : handlers.get('all')
 
     for (const x of method) {
+      if (r.ended || r.aborted)
+        return
+
       if (hasOwn.call(r, $.error) !== x.error)
         continue
 

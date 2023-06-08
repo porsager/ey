@@ -13,6 +13,7 @@ export default function(Ey) {
 
     const {
       rewrite = true,
+      fallthrough = true,
       ...options
     } = o || {}
 
@@ -33,10 +34,8 @@ export default function(Ey) {
       try {
         await r.file(resolve(r.url), options)
       } catch (error) {
-        if (notFound(error))
-          return r.handled = false
-
-        throw error
+        if (!fallthrough || !notFound(error))
+          throw error
       }
     }
 
@@ -51,20 +50,18 @@ export default function(Ey) {
         await r.file(url)
         rewrites.set(trimSlash(r.pathname), url)
       } catch (error) {
-        if (!notFound(error))
+        if (!fallthrough || !notFound(error))
           throw error
 
-        if (!trimSlash(r.url))
+        if (r.aborted || !trimSlash(r.url))
           return
 
         try {
           await r.file(url = resolve(r.url + '.html'))
           rewrites.set(trimSlash(r.pathname), url)
         } catch (error) {
-          if (notFound(error))
-            return
-
-          throw error
+          if (!fallthrough || !notFound(error))
+            throw error
         }
       }
     }

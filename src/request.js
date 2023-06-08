@@ -215,7 +215,6 @@ export default class Request {
     })
 
     r.onAborted(() => writable.destroy(new Error('Aborted')))
-    r.handled = true
 
     return writable
   }
@@ -358,7 +357,6 @@ export default class Request {
   }
 
   file(file, options) {
-    this.handled = true
     options = Object.assign({
       lastModified: true,
       etag: true,
@@ -374,15 +372,12 @@ export default class Request {
         , ext = path.extname(file).slice(1)
         , type = mimes.get(ext)
 
-    if (this.headers.range)
-      return stream(this, file, type, {}, options)
-
     const compressor = compressions && compressions.length
       ? getEncoding(this.headers['accept-encoding'], compressions, type)
       : null
 
     return cache && caches[compressor || 'identity'].has(file)
-      ? (this.handled = false, this.end(...caches[compressor || 'identity'].get(file)))
+      ? this.end(...caches[compressor || 'identity'].get(file))
       : read(this, file, type, compressor, options)
   }
 }
@@ -394,13 +389,12 @@ async function read(r, file, type, compressor, o) {
   try {
     handle = await fsp.open(file)
     const stat = await handle.stat()
-    r.handled = false
 
     if (stat.size < o.minCompressSize)
       compressor = null
 
-    if (stat.size >= o.minStreamSize)
-      return stream(r, file, type, { handle, stat, compressor }, o)
+    if (r.headers.range || (stat.size >= o.minStreamSize && stat.size > o.maxCacheSize))
+      return await stream(r, file, type, { handle, stat, compressor }, o)
 
     const headers = {
       ETag: createEtag(stat.mtime, stat.size, compressor),
@@ -414,12 +408,13 @@ async function read(r, file, type, compressor, o) {
         ...headers,
         [compressor ? 'Transfer-Encoding' : 'Content-Length']: compressor ? 'chunked' : stat.size
       })
-      return handle.close()
+      return
     }
 
     let bytes = await handle.readFile()
 
     handle.close()
+    handle = null
 
     if (o.transform) {
       bytes = o.transform(bytes, file, type, r)
@@ -433,50 +428,39 @@ async function read(r, file, type, compressor, o) {
     const response = [bytes, headers]
 
     o.cache && stat.size < o.maxCacheSize && caches[compressor || 'identity'].set(file, response)
-    return r.end(bytes, headers)
-  } catch (error) {
+    r.end(bytes, headers)
+  } finally {
     r.handled = r.ended
     handle && handle.close()
-    throw error
   }
 }
 
 async function stream(r, file, type, { handle, stat, compressor }, options) {
-  r.onAborted()
   let stream
     , resolve
     , reject
 
   const promise = new Promise((a, b) => (resolve = a, reject = b))
+  r.onAborted(resolve)
 
   try {
-    handle || (handle = await fsp.open(file))
-    const { size, mtime } = stat || (await handle.stat())
-
-    r.handled = false
-    if (r.aborted)
-      return cleanup()
-
-    r.onAborted(cleanup)
-
-    const range = r.headers.range || ''
+    const { size, mtime } = stat
+        , range = r.headers.range || ''
         , highWaterMark = options.highWaterMark || options.minStreamSize
         , end = parseInt(range.slice(range.indexOf('-') + 1)) || size - 1
         , start = parseInt(range.slice(6, range.indexOf('-')) || size - end - 1)
         , total = end - start + 1
 
-    if (end >= size) {
-      r.end('Range Not Satisfiable', 416, { 'Content-Range': 'bytes */' + (size - 1) })
-      return cleanup()
-    }
+    if (end >= size)
+      return r.end('Range Not Satisfiable', 416, { 'Content-Range': 'bytes */' + (size - 1) })
 
     stream = handle.createReadStream({ start, end, highWaterMark })
 
     if (compressor)
       stream = stream.pipe(streamingCompressors[compressor]({ chunkSize: highWaterMark }))
 
-    stream.on('close', cleanup)
-    stream.on('error', x => reject(x))
+    stream.on('close', close)
+    stream.on('error', reject)
     stream.on('data', compressor ? writeData : tryData)
 
     const status = range ? 206 : 200
@@ -494,8 +478,7 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
       compressor
         ? headers['Transfer-Encoding'] = 'chunked'
         : headers['Content-Length'] = size
-      r.end(status, headers)
-      return cleanup()
+      return r.end(status, headers)
     }
 
     r.head(status, headers)
@@ -508,7 +491,8 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
     await promise
 
     function writeData(x) {
-      r.write(x) || stream.pause()
+      const wat = r.write(x)
+      wat || stream.pause()
     }
 
     function writeResume() {
@@ -534,17 +518,13 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
         : ok && stream && stream.resume()
       return ok
     }
-  } catch (error) {
-    throw error
-  } finally {
-    cleanup()
-  }
 
-  function cleanup() {
-    r.ended || r.aborted || (r[$.res].cork(() => r[$.res].end()), r.ended = true)
-    handle && handle.close()
-    stream && stream.destroy()
-    stream = handle = null
+    function close() {
+      r.ended || r.end()
+      resolve()
+    }
+  } finally {
+    stream.destroy()
   }
 }
 
