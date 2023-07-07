@@ -317,7 +317,7 @@ function upgrader(pattern, options) {
       , data
     try {
       data = options.upgrade(r)
-      data && typeof data.then === 'function' && (res.onAborted(), data = await data)
+      data && typeof data.then === 'function' && (r.onAborted(), data = await data)
     } catch (err) {
       error = err
       console.error(500, 'Uncaught upgrade error', error)
