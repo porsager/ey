@@ -1,6 +1,6 @@
 {
   "name": "ey",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "Ey is an ergonomic and fast server+router, built on uWebSockets",
   "main": "src/index.js",
   "type": "module",
