@@ -383,6 +383,7 @@ export default class Request {
 }
 
 async function read(r, file, type, compressor, o) {
+  r.handled = true
   r.onAborted()
   let handle
 
