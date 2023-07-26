@@ -394,7 +394,7 @@ async function read(r, file, type, compressor, o) {
       compressor = null
 
     if (r.headers.range || (stat.size >= o.minStreamSize && stat.size > o.maxCacheSize))
-      return await stream(r, file, type, { handle, stat, compressor }, o)
+      return stream(r, file, type, { handle, stat, compressor }, o)
 
     const headers = {
       ETag: createEtag(stat.mtime, stat.size, compressor),
