@@ -390,27 +390,13 @@ async function read(r, file, type, compressor, o) {
   try {
     handle = await fsp.open(file)
     const stat = await handle.stat()
+    r.handled = false
 
     if (stat.size < o.minCompressSize)
       compressor = null
 
     if (r.headers.range || (stat.size >= o.minStreamSize && stat.size > o.maxCacheSize))
-      return stream(r, file, type, { handle, stat, compressor }, o)
-
-    const headers = {
-      ETag: createEtag(stat.mtime, stat.size, compressor),
-      'Last-Modified': stat.mtime.toUTCString(),
-      'Content-Encoding': compressor,
-      'Content-Type': type
-    }
-
-    if (r.method === 'head') {
-      r.end(200, {
-        ...headers,
-        [compressor ? 'Transfer-Encoding' : 'Content-Length']: compressor ? 'chunked' : stat.size
-      })
-      return
-    }
+      return await stream(r, file, type, { handle, stat, compressor }, o)
 
     let bytes = await handle.readFile()
 
@@ -426,10 +412,19 @@ async function read(r, file, type, compressor, o) {
     if (compressor)
       bytes = await compressors[compressor](bytes)
 
-    const response = [bytes, headers]
+    const headers = {
+      ETag: createEtag(stat.mtime, stat.size, compressor),
+      'Last-Modified': stat.mtime.toUTCString(),
+      'Content-Encoding': compressor,
+      'Content-Type': type
+    }
 
+    const response = [bytes, headers]
     o.cache && stat.size < o.maxCacheSize && caches[compressor || 'identity'].set(file, response)
-    r.end(bytes, headers)
+
+    r.method === 'head'
+      ? r.end(200, { ...headers, 'Content-Length' : bytes.length })
+      : r.end(bytes, headers)
   } finally {
     r.handled = r.ended
     handle && handle.close()
@@ -444,16 +439,39 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
   const promise = new Promise((a, b) => (resolve = a, reject = b))
   r.onAborted(resolve)
 
-  try {
-    const { size, mtime } = stat
-        , range = r.headers.range || ''
-        , highWaterMark = options.highWaterMark || options.minStreamSize
-        , end = parseInt(range.slice(range.indexOf('-') + 1)) || size - 1
-        , start = parseInt(range.slice(6, range.indexOf('-')) || size - end - 1)
-        , total = end - start + 1
+  const { size, mtime } = stat
+      , range = r.headers.range || ''
+      , highWaterMark = options.highWaterMark || options.minStreamSize
+      , end = parseInt(range.slice(range.indexOf('-') + 1)) || size - 1
+      , start = parseInt(range.slice(6, range.indexOf('-')) || size - end - 1)
+      , total = end - start + 1
 
-    if (end >= size)
-      return r.end('Range Not Satisfiable', 416, { 'Content-Range': 'bytes */' + (size - 1) })
+  if (end >= size)
+    return r.end('Range Not Satisfiable', 416, { 'Content-Range': 'bytes */' + (size - 1) })
+
+  const status = range ? 206 : 200
+  const headers = {
+    'Accept-Ranges': range ? undefined : 'bytes',
+    'Last-Modified': mtime.toUTCString(),
+    'Content-Encoding': compressor,
+    'Content-Range': range && 'bytes ' + start + '-' + end + '/' + size,
+    'Content-Type': type,
+    Connection: 'keep-alive', // really ? needed ?
+    ETag: createEtag(mtime, size, compressor)
+  }
+
+  if (r.method === 'head') {
+    compressor
+      ? headers['Transfer-Encoding'] = 'chunked'
+      : headers['Content-Length'] = size
+    return r.end(status, headers)
+  }
+
+  r.head(status, headers)
+
+  try {
+    let lastOffset
+      , ab
 
     stream = handle.createReadStream({ start, end, highWaterMark })
 
@@ -463,29 +481,6 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
     stream.on('close', close)
     stream.on('error', reject)
     stream.on('data', compressor ? writeData : tryData)
-
-    const status = range ? 206 : 200
-    const headers = {
-      'Accept-Ranges': range ? undefined : 'bytes',
-      'Last-Modified': mtime.toUTCString(),
-      'Content-Encoding': compressor,
-      'Content-Range': range && 'bytes ' + start + '-' + end + '/' + size,
-      'Content-Type': type,
-      Connection: 'keep-alive', // really ? needed ?
-      ETag: createEtag(mtime, size, compressor)
-    }
-
-    if (r.method === 'head') {
-      compressor
-        ? headers['Transfer-Encoding'] = 'chunked'
-        : headers['Content-Length'] = size
-      return r.end(status, headers)
-    }
-
-    r.head(status, headers)
-
-    let lastOffset
-      , ab
 
     r.onWritable(compressor ? writeResume : tryResume)
 
