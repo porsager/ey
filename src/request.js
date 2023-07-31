@@ -1,11 +1,12 @@
 import uWS from 'uWebSockets.js'
 
-import fsp              from 'node:fs/promises'
-import zlib             from 'node:zlib'
-import { promisify }    from 'node:util'
-import path             from 'node:path'
-import { STATUS_CODES } from 'node:http'
-import Stream           from 'node:stream'
+import fsp                    from 'node:fs/promises'
+import zlib                   from 'node:zlib'
+import { promisify }          from 'node:util'
+import path                   from 'node:path'
+import { STATUS_CODES }       from 'node:http'
+import { Readable, Writable } from 'node:stream'
+import { pipeline }           from 'node:stream/promises'
 
 import mimes, { compressable } from './mimes.js'
 import {
@@ -169,7 +170,7 @@ export default class Request {
     if (r[$.readable] !== null)
       return r[$.readable]
 
-    const stream = r[$.readable] = new Stream.Readable({
+    const stream = r[$.readable] = new Readable({
       read() {
         r.resume()
       }
@@ -197,7 +198,7 @@ export default class Request {
     if (r[$.writable] !== null)
       return r[$.writable]
 
-    const writable = r[$.writable] = new Stream.Writable({
+    const writable = r[$.writable] = new Writable({
       autoDestroy: true,
       write(chunk, encoding, callback) {
         r.write(chunk)
@@ -432,13 +433,6 @@ async function read(r, file, type, compressor, o) {
 }
 
 async function stream(r, file, type, { handle, stat, compressor }, options) {
-  let stream
-    , resolve
-    , reject
-
-  const promise = new Promise((a, b) => (resolve = a, reject = b))
-  r.onAborted(resolve)
-
   const { size, mtime } = stat
       , range = r.headers.range || ''
       , highWaterMark = options.highWaterMark || options.minStreamSize
@@ -469,58 +463,54 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
 
   r.head(status, headers)
 
-  try {
-    let lastOffset
-      , ab
+  let ab
+    , resume
+    , lastOffset
 
-    stream = handle.createReadStream({ start, end, highWaterMark })
+  const ac = new AbortController()
+  const signal = ac.signal
 
-    if (compressor)
-      stream = stream.pipe(streamingCompressors[compressor]({ chunkSize: highWaterMark }))
+  r.onAborted(() => ac.abort())
+  r.onWritable(compressor ? writeResume : tryResume)
 
-    stream.on('close', close)
-    stream.on('error', reject)
-    stream.on('data', compressor ? writeData : tryData)
+  await pipeline(
+    handle.createReadStream({ start, end, highWaterMark }),
+    ...(compressor ? [streamingCompressors[compressor]({ chunkSize: highWaterMark })] : []),
+    new Writable({
+      write: compressor ? writeData : tryData
+    }),
+    { signal }
+  ).catch(e => {
+    if (!r.aborted || e.code !== 'ABORT_ERR')
+      throw e
+  })
 
-    r.onWritable(compressor ? writeResume : tryResume)
+  r.end()
 
-    await promise
+  function writeData(x, encoding, callback) {
+    r.write(x)
+      ? callback()
+      : (resume = callback)
+  }
 
-    function writeData(x) {
-      const wat = r.write(x)
-      wat || stream.pause()
-    }
+  function writeResume() {
+    resume()
+    return true
+  }
 
-    function writeResume() {
-      if (!stream)
-        return
-      stream.resume()
-      return true
-    }
+  function tryData(x, encoding, callback) {
+    ab = x.buffer
+    lastOffset = r.getWriteOffset()
+    const [ok, done] = r.tryEnd(ab, total)
+    ok
+      ? (callback(), done && (r.ended = true))
+      : resume = callback
+  }
 
-    function tryData(x) {
-      ab = x.buffer
-      lastOffset = r.getWriteOffset()
-      const [ok, done] = r.tryEnd(ab, total)
-      done
-        ? resolve(r.ended = true)
-        : ok || stream.pause()
-    }
-
-    function tryResume(offset) {
-      const [ok, done] = r.tryEnd(ab.slice(offset - lastOffset), total)
-      done
-        ? resolve(r.ended = true)
-        : ok && stream && stream.resume()
-      return ok
-    }
-
-    function close() {
-      r.ended || r.end()
-      resolve()
-    }
-  } finally {
-    stream.destroy()
+  function tryResume(offset) {
+    const [ok, done] = r.tryEnd(ab.slice(offset - lastOffset), total)
+    ok && (resume(), done && (r.ended = true))
+    return ok
   }
 }
 
