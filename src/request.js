@@ -55,6 +55,7 @@ export default class Request {
     this.ended = false
     this.paused = false
     this.last = null
+    this.corked = 0
     this[$.res] = res
     this[$.req] = req
     this[$.options] = options
@@ -89,10 +90,12 @@ export default class Request {
     buffer && (this[$.data] = [])
     return this[$.reading] = new Promise((resolve, reject) => {
       this[$.res].onData((data, isLast) => {
+        this.corked++
         this[$.onData]
           ? this[$.onData](Buffer.from(data), isLast)
           : this[$.data].push(Buffer.from(Buffer.from(data)))
         isLast && resolve()
+        this.corked--
       })
     })
   }
@@ -281,7 +284,7 @@ export default class Request {
       return this
 
     if (this.handled)
-      return (this[$.res].cork(() => this[$.res].end(body)), this.ended = true, this)
+      return (this.cork(() => this[$.res].end(body)), this.ended = true, this)
 
     typeof body === 'number' && (headers = status, status = body, body = null)
     typeof status === 'object' && (headers = status, status = null)
@@ -308,9 +311,14 @@ export default class Request {
   }
 
   cork(fn) {
+    if (this.corked)
+      return fn()
+
+    this.corked++
     let result = this.aborted
     this.handled = true
     result || this[$.res].cork(() => result = fn())
+    this.corked--
     return result
   }
 
@@ -320,7 +328,10 @@ export default class Request {
 
   onWritable(fn) {
     this.handled = true
-    return this[$.res].onWritable(fn)
+    this.corked++
+    const x = this[$.res].onWritable(fn)
+    this.corked--
+    return x
   }
 
   tryEnd(x, total) {
