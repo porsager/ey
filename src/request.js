@@ -1,17 +1,15 @@
 import uWS from 'uWebSockets.js'
 
-import fsp                    from 'node:fs/promises'
-import zlib                   from 'node:zlib'
-import { promisify }          from 'node:util'
-import path                   from 'node:path'
-import { STATUS_CODES }       from 'node:http'
-import { Readable, Writable } from 'node:stream'
-import { pipeline }           from 'node:stream/promises'
+import fsp                      from 'node:fs/promises'
+import zlib                     from 'node:zlib'
+import { promisify }            from 'node:util'
+import path                     from 'node:path'
+import { STATUS_CODES }         from 'node:http'
+import { Readable, Writable }   from 'node:stream'
+import { pipeline }             from 'node:stream/promises'
 
-import mimes, { compressable } from './mimes.js'
-import {
-  symbols as $
-} from './shared.js'
+import mimes, { compressable }  from './mimes.js'
+import { state, symbols as $ }  from './shared.js'
 
 const cwd = process.cwd()
 const ipv4 = Buffer.from('00000000000000000000ffff', 'hex')
@@ -49,20 +47,17 @@ export default class Request {
     this.pathname = this.url
     this.params = {}
     this.headers = {}
-    this.reading = false
-    this.handled = false
-    this.aborted = false
-    this.ended = false
     this.paused = false
     this.last = null
-    this.corked = 0
     this[$.res] = res
     this[$.req] = req
+    this[$.state] = 1
     this[$.options] = options
     this[$.query] = req.getQuery() || ''
     this[$.readable] = null
     this[$.writable] = null
     this[$.abort] = null
+    this[$.status] = null
     this[$.headers] = null
     this[$.headersRead] = null
     this[$.onData] = null
@@ -88,16 +83,16 @@ export default class Request {
       return this[$.reading]
 
     buffer && (this[$.data] = [])
-    return this[$.reading] = new Promise((resolve, reject) => {
+    return this[$.reading] = this[$.working] = new Promise((resolve, reject) => {
       this[$.res].onData((data, isLast) => {
-        this.corked++
         this[$.onData]
           ? this[$.onData](Buffer.from(data), isLast)
           : this[$.data].push(Buffer.from(Buffer.from(data)))
         isLast && resolve()
-        this.corked--
       })
-    })
+    }).finally(() =>
+      this[$.reading] = this[$.working] = null
+    )
   }
 
   async body(type) {
@@ -142,7 +137,7 @@ export default class Request {
     this.ip // ensure IP is read on first tick
     this[$.req] = null
     return this[$.res].onAborted(() => {
-      this.aborted = true
+      this[$.state] = state.ENDED
       this[$.abort] && this[$.abort].forEach(x => x())
     })
   }
@@ -224,14 +219,14 @@ export default class Request {
   }
 
   resume() {
-    if (!this.paused || this.handled || this.aborted)
+    if (!this.paused || this[$.state] === state.ENDED)
       return
     this.paused = false
     this[$.res].resume()
   }
 
   pause() {
-    if (this.paused || this.handled || this.aborted)
+    if (this.paused || this[$.state] === state.ENDED)
       return
     this.paused = true
     this[$.res].pause()
@@ -244,7 +239,7 @@ export default class Request {
     if (options.Expires && options.Expires instanceof Date)
       options.Expires = options.Expires.toUTCString()
 
-    return this.set(
+    return this.header(
       'Set-Cookie',
       encodeURIComponent(name) + '=' + encodeURIComponent(value) + '; '
         + Object.entries({
@@ -264,108 +259,122 @@ export default class Request {
       : (this[$.headersRead] = true, this[$.req].forEach((k, v) => this.headers[k] = v))
   }
 
-  set(h, v) {
-    typeof h === 'object'
-      ? Object.entries(h).forEach(xs => this.set(...xs))
-      : v && (this[$.headers]
-        ? this[$.headers].push(['' + h, '' + v])
-        : this[$.headers] = [['' + h, '' + v]]
-      )
-  }
-
   close() {
-    this.handled = true
+    this[$.state] = state.ENDED
     this[$.res].close()
     return this
   }
 
-  end(body, status, headers) {
-    if (this.aborted || this.ended)
+  end(x, status, headers) {
+    if (this[$.state] === state.ENDED)
       return this
 
-    if (this.handled)
-      return (this.cork(() => this[$.res].end(body)), this.ended = true, this)
-
-    typeof body === 'number' && (headers = status, status = body, body = null)
-    typeof status === 'object' && (headers = status, status = null)
-    return this.head(status || 200, headers, () => {
+    status && this.status(status)
+    headers && this.header(headers)
+    this.cork(() => {
       this.method === 'head'
-        ? this[$.res].endWithoutBody()
-        : this[$.res].end(body || '')
-      this.ended = true
-    })
-  }
-
-  head(status, headers, fn) {
-    this.handled = true
-    headers && this.set(headers)
-    this.aborted || this.cork(() => {
-      status && this[$.res].writeStatus(typeof status === 'number'
-        ? status + (status in STATUS_CODES ? ' ' + STATUS_CODES[status] : '')
-        : status
-      )
-      this[$.headers] && this[$.headers].forEach(xs => this[$.res].writeHeader(...xs))
-      fn && fn()
+        ? this[$.res].endWithoutBody(Buffer.byteLength(x))
+        : this[$.res].end(x || '')
+      this[$.state] = state.ENDED
     })
     return this
   }
 
-  cork(fn) {
-    if (this.corked)
-      return fn()
+  statusEnd(status, headers) {
+    return this.end(STATUS_CODES[500], status, headers)
+  }
 
-    this.corked++
-    let result = this.aborted
-    this.handled = true
-    result || this[$.res].cork(() => result = fn())
-    this.corked--
+  status(x) {
+    this[$.status] = x
+    return this
+  }
+
+  header(h, v, x) {
+    if (typeof h === 'number') {
+      this.status(h)
+      h = v
+      v = x
+    }
+    typeof h === 'object'
+      ? Object.entries(h).forEach(xs => this.header(...xs))
+      : v && (this[$.headers]
+        ? this[$.headers].push(['' + h, '' + v])
+        : this[$.headers] = [['' + h, '' + v]]
+      )
+    return this
+  }
+
+  set(...xs) {
+    return this.header(...xs)
+  }
+
+  cork(fn) {
+    let result
+    this[$.res].cork(() => {
+      if (this[$.state] < state.SENT_HEADERS) {
+        if (this[$.state] < state.SENT_STATUS) {
+          this[$.state] = state.SENT_STATUS
+          const status = this[$.status]
+          status && this[$.res].writeStatus(typeof status === 'number'
+            ? status + (status in STATUS_CODES ? ' ' + STATUS_CODES[status] : '')
+            : status
+          )
+        }
+        this[$.state] = state.SENT_HEADERS
+        this[$.headers] && this[$.headers].forEach(xs => this[$.res].writeHeader(...xs))
+      }
+      result = fn()
+    })
     return result
   }
 
   getWriteOffset() {
-    return this.aborted || this[$.res].getWriteOffset()
+    return this[$.state] === state.ENDED || this[$.res].getWriteOffset()
   }
 
   onWritable(fn) {
-    this.handled = true
-    this.corked++
-    const x = this[$.res].onWritable(fn)
-    this.corked--
-    return x
+    return this[$.res].onWritable(fn)
   }
 
   tryEnd(x, total) {
-    this.handled = true
-    if (this.aborted)
+    if (this[$.state] === state.ENDED)
       return [true, true]
 
     try {
-      return this.cork(() => this[$.res].tryEnd(x, total))
+      return this.cork(() => {
+        if (this.method === 'head') {
+          this[$.res].endWithoutBody(total)
+          return [true, true]
+        }
+
+        const xs = this[$.res].tryEnd(x, total)
+        xs[1] && (this[$.state] = state.ENDED)
+        return xs
+      })
     } catch (err) {
       return [true, true]
     }
   }
 
   write(x) {
-    return this.cork(() => this[$.res].write(x))
+    if (this[$.state] === state.ENDED)
+      return true
+
+    return this.cork(() =>
+      this.method === 'head'
+        ? this[$.res].endWithoutBody()
+        : this[$.res].write(x)
+    )
   }
 
-  writeHeader(k, v) {
-    return this.cork(() => this[$.res].writeHeader(k, v))
+  json(body) {
+    this.header('Content-Type', 'application/json')
+    return this.end(JSON.stringify(body))
   }
 
-  writeStatus(x) {
-    return this.cork(() => this[$.res].writeStatus(x))
-  }
-
-  json(body, ...xs) {
-    this.set('Content-Type', 'application/json')
-    return this.end(JSON.stringify(body), ...xs)
-  }
-
-  html(body, ...xs) {
-    this.set('Content-Type', 'text/html')
-    return this.end(body, ...xs)
+  html(body) {
+    this.header('Content-Type', 'text/html')
+    return this.end(body)
   }
 
   file(file, options) {
@@ -395,14 +404,14 @@ export default class Request {
 }
 
 async function read(r, file, type, compressor, o) {
-  r.handled = true
   r.onAborted()
   let handle
+    , resolve
 
+  r[$.working] = new Promise(r => resolve = r)
   try {
     handle = await fsp.open(file)
     const stat = await handle.stat()
-    r.handled = false
 
     if (stat.size < o.minCompressSize)
       compressor = null
@@ -431,14 +440,11 @@ async function read(r, file, type, compressor, o) {
       'Content-Type': type
     }
 
-    const response = [bytes, headers]
+    const response = [bytes, 200, headers]
     o.cache && stat.size < o.maxCacheSize && caches[compressor || 'identity'].set(file, response)
-
-    r.method === 'head'
-      ? r.end(200, { ...headers, 'Content-Length' : bytes.length })
-      : r.end(bytes, headers)
+    r.end(...response)
   } finally {
-    r.handled = r.ended
+    resolve()
     handle && handle.close()
   }
 }
@@ -452,7 +458,7 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
       , total = end - start + 1
 
   if (end >= size)
-    return r.end('Range Not Satisfiable', 416, { 'Content-Range': 'bytes */' + (size - 1) })
+    return r.header(416, { 'Content-Range': 'bytes */' + (size - 1) }).end('Range Not Satisfiable')
 
   const status = range ? 206 : 200
   const headers = {
@@ -465,23 +471,20 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
     ETag: createEtag(mtime, size, compressor)
   }
 
-  if (r.method === 'head') {
-    compressor
-      ? headers['Transfer-Encoding'] = 'chunked'
-      : headers['Content-Length'] = size
-    return r.end(status, headers)
-  }
-
-  r.head(status, headers)
+  r.header(status, headers)
 
   let ab
     , resume
-    , lastOffset
+    , lastOffset = -1
+    , ignore = false
 
   const ac = new AbortController()
   const signal = ac.signal
 
-  r.onAborted(() => ac.abort())
+  r.onAborted(() => {
+    ignore = true
+    ac.abort()
+  })
   r.onWritable(compressor ? writeResume : tryResume)
 
   await pipeline(
@@ -492,7 +495,7 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
     }),
     { signal }
   ).catch(e => {
-    if (!r.aborted || e.code !== 'ABORT_ERR')
+    if (!ignore || e.code !== 'ABORT_ERR')
       throw e
   })
 
@@ -512,15 +515,15 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
   function tryData(x, encoding, callback) {
     ab = x.buffer
     lastOffset = r.getWriteOffset()
-    const [ok, done] = r.tryEnd(ab, total)
+    const [ok] = r.tryEnd(ab, total)
     ok
-      ? (callback(), done && (r.ended = true))
+      ? callback()
       : resume = callback
   }
 
   function tryResume(offset) {
-    const [ok, done] = r.tryEnd(ab.slice(offset - lastOffset), total)
-    ok && (resume(), done && (r.ended = true))
+    const [ok] = r.tryEnd(ab.slice(offset - lastOffset), total)
+    ok && resume()
     return ok
   }
 }

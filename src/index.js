@@ -1,6 +1,6 @@
 import { STATUS_CODES } from 'node:http'
 
-import { symbols as $, hasOwn } from './shared.js'
+import { symbols as $, hasOwn, state } from './shared.js'
 import Request from './request.js'
 import files from './files.js'
 import mimes from './mimes.js'
@@ -67,8 +67,8 @@ export default function ey({
     const method = handlers.has(r.method) ? handlers.get(r.method) : handlers.get('all')
 
     for (const x of method) {
-      if (r.ended || r.aborted)
-        return
+      if (r[$.state] >= 3)
+        break
 
       if (hasOwn.call(r, $.error) !== x.error)
         continue
@@ -85,23 +85,20 @@ export default function ey({
           r.onAborted()
           r.last = await r.last
         }
-        r[$.reading] && (r.onAborted(), await r[$.reading])
+        r[$.working] && (r.onAborted(), await r[$.working])
       } catch (error) {
         r[$.error] = error
       }
-
-      if (r.handled)
-        break
     }
 
-    if (!listening || r.handled) // Ensure we only use default in listening router
+    if (!listening || r[$.state] >= 3) // Ensure we only use default in listening router
       return
 
     hasOwn.call(r, $.error)
       ? r[$.error] instanceof URIError
         ? (r.end('Bad URI', 400), console.error(400, r.url, '->', r[$.error]))
-        : (r.end(STATUS_CODES[500], 500), console.error(500, 'Uncaught route error', r[$.error]))
-      : r.end(STATUS_CODES[404], 404)
+        : (r.statusEnd(500), console.error(500, 'Uncaught route error', r[$.error]))
+      : r.statusEnd(404)
   }
 
   function listen(defaultOptions) {
@@ -323,13 +320,14 @@ function upgrader(pattern, options) {
       console.error(500, 'Uncaught upgrade error', error)
     }
 
-    if (r.aborted || r.handled)
+    if (r[$.state] === state.ENDED)
       return
 
     if (error)
-      return r.end(STATUS_CODES[500], 500)
+      return r.statusEnd(500)
 
-    r.head(101, {}, () =>
+    r.status(101)
+    r.cork(() =>
       res.upgrade(
         data || {},
         r.headers['sec-websocket-key'],

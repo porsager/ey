@@ -54,11 +54,13 @@ Returns an object representing the cookie
 
 ### Outgoing
 
-#### `.end(body, [status], [headers])`
+#### `.status(status)`
 
-#### `.head([status], [headers], [cork_last])`
+#### `.header(name, value) | r.header({ name: value })`
 
-#### `.set(header, value) | r.set({ header: value })`
+#### `.end(body)`
+
+#### `.tryEnd(body)`
 
 #### `.write()`
 
@@ -82,7 +84,7 @@ Implement middleware with `all`. Ey forwards the request to the next handler, un
 app.all((r, next) => {
   r.headers.authorization
     ? r.token = r.headers.authorization.split(' ')[1]
-    : r.end(401) // request ends here
+    : r.statusEnd(401) // request ends here
 })
 
 app.all(r => {
@@ -207,9 +209,7 @@ app.post('/file', async r => {
 ```javascript
 // GET /old-link
 app.get('/old-link', async r => {
-  r.end(302, {
-    location: '/new-link'
-  })
+  r.statusEnd(302, { location: '/new-link' })
 })
 ```
 

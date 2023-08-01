@@ -1,5 +1,7 @@
 import path from 'node:path'
 
+import { state, symbols as $ } from './shared.js'
+
 const rewrites = new Map()
 const trimSlash = x => x.charCodeAt(x.length - 1) === 47 ? x.slice(0, -1) : x
 const notFound = x => x.code === 'ENOENT' || x.code === 'EISDIR'
@@ -53,7 +55,7 @@ export default function(Ey) {
         if (!fallthrough || !notFound(error))
           throw error
 
-        if (r.aborted || !trimSlash(r.url))
+        if (r[$.state] === state.ENDED || !trimSlash(r.url))
           return
 
         try {
