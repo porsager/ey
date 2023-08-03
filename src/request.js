@@ -266,16 +266,13 @@ export default class Request {
   }
 
   end(x, status, headers) {
-    if (this[$.state] === state.ENDED)
-      return this
-
     status && this.status(status)
     headers && this.header(headers)
     this.cork(() => {
-      this.method === 'head'
-        ? this[$.res].endWithoutBody(Buffer.byteLength(x))
-        : this[$.res].end(x || '')
       this[$.state] = state.ENDED
+      this.method === 'head'
+        ? this[$.res].endWithoutBody(x && Buffer.byteLength(x))
+        : this[$.res].end(x || '')
     })
     return this
   }
@@ -309,6 +306,9 @@ export default class Request {
   }
 
   cork(fn) {
+    if (this[$.state] === state.ENDED)
+      return
+
     let result
     this[$.res].cork(() => {
       if (this[$.state] < state.SENT_HEADERS) {
@@ -329,7 +329,9 @@ export default class Request {
   }
 
   getWriteOffset() {
-    return this[$.state] === state.ENDED || this[$.res].getWriteOffset()
+    return this[$.state] === state.ENDED
+      ? -1
+      : this[$.res].getWriteOffset()
   }
 
   onWritable(fn) {
@@ -343,6 +345,7 @@ export default class Request {
     try {
       return this.cork(() => {
         if (this.method === 'head') {
+          this[$.state] = state.ENDED
           this[$.res].endWithoutBody(total)
           return [true, true]
         }
@@ -352,6 +355,7 @@ export default class Request {
         return xs
       })
     } catch (err) {
+      this[$.state] = state.ENDED
       return [true, true]
     }
   }
@@ -362,7 +366,7 @@ export default class Request {
 
     return this.cork(() =>
       this.method === 'head'
-        ? this[$.res].endWithoutBody()
+        ? this.end()
         : this[$.res].write(x)
     )
   }
