@@ -20,6 +20,7 @@ export const symbols = {
   state: Symbol('state'),
   onData: Symbol('onData'),
   status: Symbol('status'),
+  corked: Symbol('corked'),
   headers: Symbol('headers'),
   options: Symbol('options'),
   reading: Symbol('reading'),

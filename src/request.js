@@ -54,6 +54,7 @@ export default class Request {
     this[$.state] = 1
     this[$.options] = options
     this[$.query] = req.getQuery() || ''
+    this[$.corked] = false
     this[$.readable] = null
     this[$.writable] = null
     this[$.abort] = null
@@ -309,6 +310,9 @@ export default class Request {
     if (this[$.state] === state.ENDED)
       return
 
+    if (this[$.corked])
+      return fn()
+
     let result
     this[$.res].cork(() => {
       if (this[$.state] < state.SENT_HEADERS) {
@@ -335,7 +339,11 @@ export default class Request {
   }
 
   onWritable(fn) {
-    return this[$.res].onWritable(fn)
+    return this[$.res].onWritable(x => {
+      this[$.corked] = true
+      fn(x)
+      this[$.corked] = false
+    })
   }
 
   tryEnd(x, total) {
