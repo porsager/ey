@@ -272,7 +272,9 @@ export default class Request {
     this.cork(() => {
       this[$.state] = state.ENDED
       this.method === 'head'
-        ? this[$.res].endWithoutBody(x && Buffer.byteLength(x))
+        ? x
+          ? this[$.res].endWithoutBody(Buffer.byteLength(x))
+          : this[$.res].endWithoutBody()
         : this[$.res].end(x || '')
     })
     return this
@@ -472,8 +474,7 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
   if (end >= size)
     return r.header(416, { 'Content-Range': 'bytes */' + (size - 1) }).end('Range Not Satisfiable')
 
-  const status = range ? 206 : 200
-  const headers = {
+  r.header(range ? 206 : 200, {
     'Accept-Ranges': range ? undefined : 'bytes',
     'Last-Modified': mtime.toUTCString(),
     'Content-Encoding': compressor,
@@ -481,9 +482,14 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
     'Content-Type': type,
     Connection: 'keep-alive', // really ? needed ?
     ETag: createEtag(mtime, size, compressor)
-  }
+  })
 
-  r.header(status, headers)
+  if (r.method === 'head') {
+    compressor
+      ? r.header('Transfer-Encoding', 'chunked')
+      : r.header('Content-Length', size)
+    return r.end()
+  }
 
   let ab
     , resume
