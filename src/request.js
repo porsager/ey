@@ -282,7 +282,7 @@ export default class Request {
   }
 
   statusEnd(status, headers) {
-    return this.end(STATUS_CODES[500], status, headers)
+    return this.end(STATUS_CODES[status], status, headers)
   }
 
   status(x) {
