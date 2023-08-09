@@ -271,11 +271,12 @@ export default class Request {
     headers && this.header(headers)
     this.cork(() => {
       this[$.state] = state.ENDED
-      this.method === 'head'
-        ? x
-          ? this[$.res].endWithoutBody(Buffer.byteLength(x))
-          : this[$.res].endWithoutBody()
-        : this[$.res].end(x || '')
+
+      if (this.method !== 'head')
+        return this[$.res].end(x)
+
+      x && this[$.res].writeHeader('Content-Length', '' + Buffer.byteLength(x))
+      this[$.res].endWithoutBody()
     })
     return this
   }
