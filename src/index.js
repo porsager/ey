@@ -171,7 +171,7 @@ export default function ey({
       try {
         fn(method, ws, ...xs)
       } catch (error) {
-        ws.end(1011, 'Internal Server Error')
+        name === 'close' || ws.end(1011, 'Internal Server Error')
         console.error(500, 'Uncaught ' + name + ' error', error)
       }
     }
