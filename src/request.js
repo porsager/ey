@@ -6,7 +6,6 @@ import { promisify }            from 'node:util'
 import path                     from 'node:path'
 import { STATUS_CODES }         from 'node:http'
 import { Readable, Writable }   from 'node:stream'
-import { pipeline }             from 'node:stream/promises'
 
 import mimes, { compressable }  from './mimes.js'
 import { state, symbols as $ }  from './shared.js'
@@ -396,9 +395,9 @@ export default class Request {
     options = Object.assign({
       lastModified: true,
       etag: true,
-      minStreamSize: 512 * 1024,
-      maxCacheSize: 128 * 1024,
-      minCompressSize: 1280,
+      minStreamSize: process.env.EY_MIN_STREAM_SIZE || (512 * 1024),
+      maxCacheSize: process.env.EY_MIN_CACHE_SIZE || (128 * 1024),
+      minCompressSize: process.env.EY_MIN_COMPRESS_SIZE || 1280,
       cache: true
     }, options)
 
@@ -492,59 +491,58 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
     return r.end()
   }
 
-  let ab
+  compressor
+    ? await streamCompressed(r, handle, compressor, highWaterMark, total, start)
+    : await streamRaw(r, handle, highWaterMark, total, start)
+}
+
+async function streamRaw(r, handle, highWaterMark, total, start) {
+  let lastOffset = 0
+    , offset = 0
+    , ok = false
+    , done = false
+    , read = 0
+    , buffer = Buffer.allocUnsafe(highWaterMark)
+
+  while (!done) {
+    const { bytesRead } = await handle.read(buffer, 0, Math.min(highWaterMark, total - read), start + read)
+    if (done)
+      return
+    read += bytesRead
+    lastOffset = offset = r.getWriteOffset()
+    do {
+      [ok, done] = r.tryEnd(buffer.slice(offset - lastOffset, bytesRead), total)
+      ok || (offset = await new Promise(x => r.onWritable(x)))
+    } while (!ok && !done)
+  }
+}
+
+async function streamCompressed(r, handle, compressor, highWaterMark, total, start) {
+  let read = 0
+    , ok = true
+    , buffer = Buffer.allocUnsafe(highWaterMark)
+    , compressStream = streamingCompressors[compressor]({ chunkSize: highWaterMark, finishFlush: zlib.constants.Z_SYNC_FLUSH })
+    , resolve
+    , reject
     , resume
-    , lastOffset = -1
-    , ignore = false
 
-  const ac = new AbortController()
-  const signal = ac.signal
+  const promise = new Promise((r, e) => (resolve = r, reject = e))
 
-  r.onAborted(() => {
-    ignore = true
-    ac.abort()
-  })
-  r.onWritable(compressor ? writeResume : tryResume)
+  compressStream.on('data', x => ok = r.write(x))
+  compressStream.on('drain', () => resume && resume())
+  compressStream.on('close', resolve)
+  compressStream.on('error', reject)
 
-  await pipeline(
-    handle.createReadStream({ start, end, highWaterMark }),
-    ...(compressor ? [streamingCompressors[compressor]({ chunkSize: highWaterMark })] : []),
-    new Writable({
-      write: compressor ? writeData : tryData
-    }),
-    { signal }
-  ).catch(e => {
-    if (!ignore || e.code !== 'ABORT_ERR')
-      throw e
-  })
-
+  while (read < total) {
+    const { bytesRead } = await handle.read(buffer, 0, Math.min(highWaterMark, total - read), start + read)
+    read += bytesRead
+    compressStream.write(buffer.slice(0, bytesRead))
+    ok || await new Promise(x => r.onWritable(x))
+    compressStream.writableNeedDrain && await new Promise(r => resume = r)
+  }
+  compressStream.end()
+  await promise
   r.end()
-
-  function writeData(x, encoding, callback) {
-    r.write(x)
-      ? callback()
-      : (resume = callback)
-  }
-
-  function writeResume() {
-    resume()
-    return true
-  }
-
-  function tryData(x, encoding, callback) {
-    ab = x.buffer
-    lastOffset = r.getWriteOffset()
-    const [ok] = r.tryEnd(ab, total)
-    ok
-      ? callback()
-      : resume = callback
-  }
-
-  function tryResume(offset) {
-    const [ok] = r.tryEnd(ab.slice(offset - lastOffset), total)
-    ok && resume()
-    return ok
-  }
 }
 
 function getEncoding(x, supported, type) {
