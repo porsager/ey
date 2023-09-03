@@ -22,6 +22,7 @@ export const compressable = new Set([
   'application/truetype',
   'application/ttf',
   'application/vnd.api+json ',
+  'application/vnd.apple.mpegurl',
   'application/vnd.ms-fontobject',
   'application/x-font-opentype',
   'application/x-font-truetype',
