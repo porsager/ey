@@ -465,6 +465,7 @@ async function read(r, file, type, compressor, o) {
 }
 
 async function stream(r, file, type, { handle, stat, compressor }, options) {
+  options.secure && (compressor = null)
   const { size, mtime } = stat
       , range = r.headers.range || ''
       , highWaterMark = options.highWaterMark || options.minStreamSize
@@ -541,7 +542,7 @@ async function streamCompressed(r, handle, compressor, highWaterMark, total, sta
     const { bytesRead } = await handle.read(buffer, 0, Math.min(highWaterMark, total - read), start + read)
     read += bytesRead
     compressStream.write(buffer.slice(0, bytesRead))
-    ok || await new Promise(x => r.onWritable(x))
+    ok || await new Promise(x => r.onWritable(() => (x(), true)))
     compressStream.writableNeedDrain && await new Promise(r => resume = r)
   }
   compressStream.end()
