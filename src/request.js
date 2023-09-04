@@ -343,8 +343,9 @@ export default class Request {
   onWritable(fn) {
     return this[$.res].onWritable(x => {
       this[$.corked] = true
-      fn(x)
+      const result = fn(x)
       this[$.corked] = false
+      return result
     })
   }
 
@@ -498,23 +499,26 @@ async function stream(r, file, type, { handle, stat, compressor }, options) {
 
 async function streamRaw(r, handle, highWaterMark, total, start) {
   let lastOffset = 0
-    , offset = 0
-    , ok = false
-    , done = false
     , read = 0
     , buffer = Buffer.allocUnsafe(highWaterMark)
 
-  while (!done) {
+  while (read < total) {
     const { bytesRead } = await handle.read(buffer, 0, Math.min(highWaterMark, total - read), start + read)
-    if (done)
-      return
     read += bytesRead
-    lastOffset = offset = r.getWriteOffset()
-    do {
-      [ok, done] = r.tryEnd(buffer.slice(offset - lastOffset, bytesRead), total)
-      ok || (offset = await new Promise(x => r.onWritable(x)))
-    } while (!ok && !done)
+    lastOffset = r.getWriteOffset()
+    const [ok] = r.tryEnd(buffer.subarray(0, bytesRead), total)
+    ok || await tryRest(r, buffer, lastOffset, bytesRead, total)
   }
+}
+
+function tryRest(r, buffer, lastOffset, bytesRead, total) {
+  return new Promise(resolve => {
+    r.onWritable(offset => {
+      const [ok] = r.tryEnd(buffer.subarray(offset - lastOffset, bytesRead), total)
+      ok && resolve()
+      return ok
+    })
+  })
 }
 
 async function streamCompressed(r, handle, compressor, highWaterMark, total, start) {
