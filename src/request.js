@@ -327,7 +327,14 @@ export default class Request {
           )
         }
         this[$.state] = state.SENT_HEADERS
-        this[$.headers] && this[$.headers].forEach(xs => this[$.res].writeHeader(...xs))
+        this[$.headers] && this[$.headers].forEach(([header, value]) => {
+          value && this[$.res].writeHeader(
+            header,
+            value instanceof Date
+              ? value.toUTCString()
+              : value
+          )
+        })
       }
       result = fn()
     })
