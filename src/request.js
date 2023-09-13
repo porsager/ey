@@ -502,24 +502,24 @@ async function streamRaw(r, handle, highWaterMark, total, start) {
   let lastOffset = 0
     , read = 0
     , buffer = Buffer.allocUnsafe(highWaterMark)
+    , aborted
+
+  r.onAborted(() => aborted && aborted())
 
   while (read < total) {
     const { bytesRead } = await handle.read(buffer, 0, Math.min(highWaterMark, total - read), start + read)
     read += bytesRead
     lastOffset = r.getWriteOffset()
     const [ok] = r.tryEnd(buffer.subarray(0, bytesRead), total)
-    ok || await tryRest(r, buffer, lastOffset, bytesRead, total)
-  }
-}
-
-function tryRest(r, buffer, lastOffset, bytesRead, total) {
-  return new Promise(resolve => {
-    r.onWritable(offset => {
-      const [ok] = r.tryEnd(buffer.subarray(offset - lastOffset, bytesRead), total)
-      ok && resolve()
-      return ok
+    ok || await new Promise(resolve => {
+      aborted = resolve
+      r.onWritable(offset => {
+        const [ok] = r.tryEnd(buffer.subarray(offset - lastOffset, bytesRead), total)
+        ok && resolve()
+        return ok
+      })
     })
-  })
+  }
 }
 
 async function streamCompressed(r, handle, compressor, highWaterMark, total, start) {
