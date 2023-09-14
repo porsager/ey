@@ -389,9 +389,9 @@ export default class Request {
     )
   }
 
-  json(body) {
+  json(body, ...xs) {
     this.header('Content-Type', 'application/json')
-    return this.end(JSON.stringify(body))
+    return this.end(JSON.stringify(body), ...xs)
   }
 
   html(body) {
