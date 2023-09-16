@@ -1,5 +1,3 @@
-import { STATUS_CODES } from 'node:http'
-
 import { symbols as $, hasOwn, state } from './shared.js'
 import Request from './request.js'
 import files from './files.js'
