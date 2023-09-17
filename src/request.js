@@ -266,6 +266,7 @@ export default class Request {
   }
 
   end(x, status, headers) {
+    typeof status === 'object' && (headers = status, status = null)
     status && this.status(status)
     headers && this.header(headers)
     this.cork(() => {
