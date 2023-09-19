@@ -246,7 +246,6 @@ export default class Request {
       encodeURIComponent(name) + '=' + encodeURIComponent(value) + '; '
         + Object.entries({
           HttpOnly: true,
-          ...{ ...(this[$.res].options.cert ? { Secure: true } : {}) },
           ...options
         }).map(([k, v]) => k + (v === true ? '' : '=' + v)).join('; ')
     )
