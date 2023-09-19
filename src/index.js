@@ -112,8 +112,8 @@ export default function ey({
 
         port = parseInt(port)
         uws = o.cert
-          ? uWS.SSLApp({ cert_file_name: o.cert, key_file_name: o.key, o })
-          : uWS.App()
+          ? uWS.SSLApp({ cert_file_name: o.cert, key_file_name: o.key, ...o })
+          : uWS.App(o)
         asn.forEach(xs => uws.addServerName(...xs))
         msn.forEach(xs => uws.missingServerName(...xs))
         rsn.forEach(xs => uws.removeServerName(...xs))
