@@ -51,7 +51,6 @@ export default class Request {
     this[$.res] = res
     this[$.req] = req
     this[$.state] = 1
-    this[$.options] = options
     this[$.query] = req.getQuery() || ''
     this[$.corked] = false
     this[$.readable] = null
@@ -247,7 +246,7 @@ export default class Request {
       encodeURIComponent(name) + '=' + encodeURIComponent(value) + '; '
         + Object.entries({
           HttpOnly: true,
-          ...{ ...(this[$.options].cert ? { Secure: true } : {}) },
+          ...{ ...(this[$.res].options.cert ? { Secure: true } : {}) },
           ...options
         }).map(([k, v]) => k + (v === true ? '' : '=' + v)).join('; ')
     )
@@ -414,8 +413,8 @@ export default class Request {
     }, options)
 
     file = path.isAbsolute(file) ? file : path.join(cwd, file)
-    const compressions = options.compressions ?? this[$.options].compressions
-        , cache = options.cache || this[$.options].cache
+    const compressions = options.compressions ?? this[$.res].options.compressions
+        , cache = options.cache || this[$.res].options.cache
         , ext = path.extname(file).slice(1)
         , type = mimes.get(ext)
 
@@ -476,7 +475,7 @@ async function read(r, file, type, compressor, o) {
 }
 
 async function stream(r, file, type, { handle, stat, compressor }, options) {
-  r[$.options].cert && (compressor = null)
+  r[$.res].options.cert && (compressor = null)
   const { size, mtime } = stat
       , range = r.headers.range || ''
       , highWaterMark = options.highWaterMark || options.minStreamSize

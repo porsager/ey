@@ -60,7 +60,7 @@ export default function ey({
   }
 
   async function router(res, req) {
-    const r = res instanceof Request ? res : new Request(res, req, o)
+    const r = res instanceof Request ? res : new Request(res, req)
     const method = handlers.has(r.method) ? handlers.get(r.method) : handlers.get('all')
 
     for (const x of method) {
@@ -118,8 +118,16 @@ export default function ey({
         msn.forEach(xs => uws.missingServerName(...xs))
         rsn.forEach(xs => uws.removeServerName(...xs))
         connects.forEach((xs) => uws.connect(...xs))
-        wss.forEach(xs => uws.ws(...xs))
-        uws.any('/*', router)
+        wss.forEach(([pattern, handlers]) =>
+          uws.ws(
+            pattern,
+            {
+              ...handlers,
+              ...(handlers.upgrade ? { upgrade: upgrader(o, pattern, handlers) } : {})
+            }
+          )
+        )
+        uws.any('/*', handle)
 
         address
           ? uws.listen(address, port, callback)
@@ -136,6 +144,11 @@ export default function ey({
         function unlisten() {
           listener && uWS.us_listen_socket_close(listener)
         }
+
+        function handle(res, req) {
+          res.options = o
+          router(res, req)
+        }
       })
     }
   }
@@ -146,7 +159,6 @@ export default function ey({
       pattern,
       {
         ...handlers,
-        ...(handlers.upgrade ? { upgrade: upgrader(pattern, handlers) } : {}),
         message: catcher('message', handlers, (fn, ws, data, binary) => fn(ws, new Message(data, binary))),
         open: catcher('open', handlers),
         subscription: catcher('subscription', handlers),
@@ -300,10 +312,11 @@ function prepareArray(match, sub) {
   }
 }
 
-function upgrader(pattern, handlers) {
+function upgrader(options, pattern, handlers) {
   handlers.headers && handlers.headers.push('sec-websocket-key', 'sec-websocket-protocol', 'sec-websocket-extensions')
   return async function(res, req, context) {
-    const r = new Request(res, req, options)
+    res.options = options
+    const r = new Request(res, req)
     ;(pattern.match(/\/:([^/]+|$)/g) || []).map((x, i) => r.params[x.slice(2)] = res.getParameter(i))
     r[$.readHeaders](handlers)
     let error
