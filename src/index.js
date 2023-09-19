@@ -29,10 +29,9 @@ export default function ey({
       , msn = new Set()
       , rsn = new Set()
 
-  hasOwn.call(o, 'compressions') || (o.compressions = o.secure ? ['br', 'gzip', 'deflate'] : ['gzip', 'deflate'])
+  hasOwn.call(o, 'compressions') || (o.compressions = o.cert ? ['br', 'gzip', 'deflate'] : ['gzip', 'deflate'])
   methods.forEach(register)
 
-  router.secure = !!o.cert
   router.route = route
   router.mimes = mimes
   router.files = files(ey)
@@ -112,7 +111,6 @@ export default function ey({
         }
 
         port = parseInt(port)
-        router.secure = !!o.cert
         uws = o.cert
           ? uWS.SSLApp({ cert_file_name: o.cert, key_file_name: o.key, o })
           : uWS.App()

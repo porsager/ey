@@ -16,7 +16,8 @@ const argv = process.argv.slice(2)
     , supportsThreads = process.platform === 'linux'
 
 const options = {
-  secure: process.env.SSL_CERT,
+  cert: process.env.SSL_CERT,
+  key: process.env.SSL_KEY,
   cache: false || !!argv.find(x => x === '--cache')
 }
 

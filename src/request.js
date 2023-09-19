@@ -247,7 +247,7 @@ export default class Request {
       encodeURIComponent(name) + '=' + encodeURIComponent(value) + '; '
         + Object.entries({
           HttpOnly: true,
-          ...{ ...(this[$.options].secure ? { Secure: this[$.options].secure } : {}) },
+          ...{ ...(this[$.options].cert ? { Secure: true } : {}) },
           ...options
         }).map(([k, v]) => k + (v === true ? '' : '=' + v)).join('; ')
     )
@@ -476,7 +476,7 @@ async function read(r, file, type, compressor, o) {
 }
 
 async function stream(r, file, type, { handle, stat, compressor }, options) {
-  options.secure && (compressor = null)
+  r[$.options].cert && (compressor = null)
   const { size, mtime } = stat
       , range = r.headers.range || ''
       , highWaterMark = options.highWaterMark || options.minStreamSize
