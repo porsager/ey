@@ -246,6 +246,7 @@ export default class Request {
       encodeURIComponent(name) + '=' + encodeURIComponent(value) + '; '
         + Object.entries({
           HttpOnly: true,
+          Path: '/',
           ...options
         }).map(([k, v]) => k + (v === true ? '' : '=' + v)).join('; ')
     )
