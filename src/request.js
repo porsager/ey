@@ -79,6 +79,9 @@ export default class Request {
   }
 
   [$.readBody](buffer) {
+    if (this[$.state] > state.RECEIVING)
+        return
+
     if (this[$.reading])
       return this[$.reading]
 
