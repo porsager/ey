@@ -140,29 +140,29 @@ export default function ey({
     }
   }
 
-  function ws(pattern, options) {
-    typeof pattern !== 'string' && (options = pattern, pattern = '/*')
+  function ws(pattern, handlers) {
+    typeof pattern !== 'string' && (handlers = pattern, pattern = '/*')
     wss.add([
       pattern,
       {
-        ...options,
-        ...(options.upgrade ? { upgrade: upgrader(pattern, options) } : {}),
-        message: catcher('message', options, (fn, ws, data, binary) => fn(ws, new Message(data, binary))),
-        open: catcher('open', options),
-        subscription: catcher('subscription', options),
-        drain: catcher('drain', options),
-        ping: catcher('ping', options),
-        pong: catcher('pong', options),
-        close: catcher('close', options)
+        ...handlers,
+        ...(handlers.upgrade ? { upgrade: upgrader(pattern, handlers) } : {}),
+        message: catcher('message', handlers, (fn, ws, data, binary) => fn(ws, new Message(data, binary))),
+        open: catcher('open', handlers),
+        subscription: catcher('subscription', handlers),
+        drain: catcher('drain', handlers),
+        ping: catcher('ping', handlers),
+        pong: catcher('pong', handlers),
+        close: catcher('close', handlers)
       }
     ])
   }
 
-  function catcher(name, options, fn = (fn, ...ws) => fn(...ws)) {
-    if (!(name in options))
+  function catcher(name, handlers, fn = (fn, ...ws) => fn(...ws)) {
+    if (!(name in handlers))
       return
 
-    const method = options[name]
+    const method = handlers[name]
     return function(ws, ...xs) {
       try {
         fn(method, ws, ...xs)
@@ -300,16 +300,16 @@ function prepareArray(match, sub) {
   }
 }
 
-function upgrader(pattern, options) {
-  options.headers && options.headers.push('sec-websocket-key', 'sec-websocket-protocol', 'sec-websocket-extensions')
+function upgrader(pattern, handlers) {
+  handlers.headers && handlers.headers.push('sec-websocket-key', 'sec-websocket-protocol', 'sec-websocket-extensions')
   return async function(res, req, context) {
     const r = new Request(res, req, options)
     ;(pattern.match(/\/:([^/]+|$)/g) || []).map((x, i) => r.params[x.slice(2)] = res.getParameter(i))
-    r[$.readHeaders](options)
+    r[$.readHeaders](handlers)
     let error
       , data
     try {
-      data = options.upgrade(r)
+      data = handlers.upgrade(r)
       data && typeof data.then === 'function' && (r.onAborted(), data = await data)
     } catch (err) {
       error = err
