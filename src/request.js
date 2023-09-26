@@ -48,11 +48,12 @@ export default class Request {
     this.headers = {}
     this.paused = false
     this.last = null
+    this.rawQuery = req.getQuery() || ''
     this[$.res] = res
     this[$.req] = req
     this[$.state] = 1
-    this[$.query] = req.getQuery() || ''
     this[$.corked] = false
+    this[$.query] = null
     this[$.readable] = null
     this[$.writable] = null
     this[$.abort] = null
@@ -145,9 +146,9 @@ export default class Request {
   }
 
   get query() {
-    return typeof this[$.query] === 'string'
-      ? this[$.query] = new URLSearchParams(this[$.query])
-      : this[$.query]
+    return this[$.query]
+      ? this[$.query]
+      : this[$.query] = new URLSearchParams(this.rawQuery)
   }
 
   get ip() {
