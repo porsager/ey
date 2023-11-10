@@ -122,6 +122,7 @@ export default function ey({
           uws.ws(
             pattern,
             {
+              maxPayloadLength: 128 * 1024,
               ...handlers,
               ...(handlers.upgrade ? { upgrade: upgrader(o, pattern, handlers) } : {})
             }
