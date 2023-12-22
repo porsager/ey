@@ -245,7 +245,7 @@ function handler(fn) {
 
   function sub(x) {
     const url = x.r.url
-    x.r.url = x.r.url.slice(x.match.length)
+    x.r.url = x.r.url.slice(x.match.length - 1)
     const result = direct(x)
     result && typeof result.then === 'function'
       ? result.finally(() => x.r.url = url)
@@ -288,7 +288,7 @@ function prepareString(match, sub) {
   const regex = new RegExp(
        '^'
      + match.replace(/:.+?(\/|$)/g, '([^/]+?)$1').replace(/\*/, '.*?')
-     + '$'
+     + (sub ? '(/|$)' : '$')
   )
 
   return function(r) {
