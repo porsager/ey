@@ -245,7 +245,7 @@ function handler(fn) {
 
   function sub(x) {
     const url = x.r.url
-    x.r.url = x.r.url.slice(x.match.length - 1)
+    x.r.url = x.r.url.slice(x.match.length)
     const result = direct(x)
     result && typeof result.then === 'function'
       ? result.finally(() => x.r.url = url)
@@ -286,15 +286,16 @@ function prepareString(match, sub) {
 
   const names = named && named.map(n => n.slice(2))
   const regex = new RegExp(
-       '^'
+       '^('
      + match.replace(/:.+?(\/|$)/g, '([^/]+?)$1').replace(/\*/, '.*?')
+     + ')'
      + (sub ? '(/|$)' : '$')
   )
 
   return function(r) {
     const result = r.url.match(regex)
     result && names && names.forEach((n, i) => r.params[n] = decodeURIComponent(result[i + 1]))
-    return result && result[0]
+    return result && result[1]
   }
 }
 
