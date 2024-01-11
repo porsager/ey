@@ -476,7 +476,6 @@ async function read(r, file, type, compressor, o) {
 }
 
 async function stream(r, file, type, { handle, stat, compressor }, options) {
-  r[$.res].options.cert && (compressor = null)
   const { size, mtime } = stat
       , range = r.headers.range || ''
       , highWaterMark = options.highWaterMark || options.minStreamSize
