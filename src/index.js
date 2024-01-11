@@ -15,6 +15,23 @@ class Message {
   get text() { return Buffer.from(this.data).toString() }
 }
 
+const monkey = {
+  close() { return this.open && this._close.apply(this, arguments) },
+  cork() { return this.open && this._cork.apply(this, arguments) },
+  end() { return this.open && this._end.apply(this, arguments) },
+  getBufferedAmount() { return this.open && this._getBufferedAmount.apply(this, arguments) },
+  getRemoteAddress() { return this.open && this._getRemoteAddress.apply(this, arguments) },
+  getRemoteAddressAsText() { return this.open && this._getRemoteAddressAsText.apply(this, arguments) },
+  getTopics() { return this.open && this._getTopics.apply(this, arguments) },
+  getUserData() { return this.open && this._getUserData.apply(this, arguments) },
+  isSubscribed() { return this.open && this._isSubscribed.apply(this, arguments) },
+  ping() { return this.open && this._ping.apply(this, arguments) },
+  publish() { return this.open && this._publish.apply(this, arguments) },
+  send() { return this.open && this._send.apply(this, arguments) },
+  subscribe() { return this.open && this._subscribe.apply(this, arguments) },
+  unsubscribe() { return this.open && this._unsubscribe.apply(this, arguments) }
+}
+
 export default function ey({
   methods = ['head', 'get', 'put', 'post', 'delete', 'patch', 'options', 'trace', 'all'],
   ...o
@@ -161,15 +178,29 @@ export default function ey({
       pattern,
       {
         ...handlers,
-        message: catcher('message', handlers, (fn, ws, data, binary) => fn(ws, new Message(data, binary))),
-        open: catcher('open', handlers),
+        open: catcher('open', handlers, open),
+        message: catcher('message', handlers, message),
         subscription: catcher('subscription', handlers),
         drain: catcher('drain', handlers),
         ping: catcher('ping', handlers),
         pong: catcher('pong', handlers),
-        close: catcher('close', handlers)
+        close: catcher('close', handlers, close)
       }
     ])
+  }
+
+  function close(fn, ws, code, data) {
+    ws.open = false
+    return fn(ws, code, new Message(data, true))
+  }
+
+  function open(fn, ws) {
+    patch(ws)
+    return fn(ws)
+  }
+
+  function message(fn, ws, data, binary) {
+    return fn(ws, new Message(data, binary))
   }
 
   function catcher(name, handlers, fn = (fn, ...ws) => fn(...ws)) {
@@ -357,4 +388,23 @@ function tryJSON(data) {
   } catch (x) {
     return undefined
   }
+}
+
+function patch(ws) {
+  ws.open = true
+  ws._close = ws.close
+  ws._cork = ws.cork
+  ws._end = ws.end
+  ws._getBufferedAmount = ws.getBufferedAmount
+  ws._getRemoteAddress = ws.getRemoteAddress
+  ws._getRemoteAddressAsText = ws.getRemoteAddressAsText
+  ws._getTopics = ws.getTopics
+  ws._getUserData = ws.getUserData
+  ws._isSubscribed = ws.isSubscribed
+  ws._ping = ws.ping
+  ws._publish = ws.publish
+  ws._send = ws.send
+  ws._subscribe = ws.subscribe
+  ws._unsubscribe = ws.unsubscribe
+  Object.assign(ws, monkey)
 }
