@@ -139,6 +139,7 @@ export default function ey({
             return reject(new Error('Could not listen on', port))
 
           listening = true
+          listener = handle
           resolve({ port: uWS.us_socket_local_port(handle), handle, unlisten })
         }
 
