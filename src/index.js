@@ -318,7 +318,7 @@ function prepareString(match, sub) {
 
   const names = named && named.map(n => n.slice(2))
   const regex = new RegExp(
-       '^('
+       '^(?:'
      + match.replace(/:.+?(\/|$)/g, '([^/]+?)$1').replace(/\*/, '.*?')
      + ')'
      + (sub ? '(/|$)' : '$')
