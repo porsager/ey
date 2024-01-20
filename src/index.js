@@ -37,7 +37,7 @@ export default function ey({
   ...o
 } = {}) {
   let uws
-    , listening
+    , handle
 
   const handlers = new Map()
       , connects = new Set()
@@ -105,7 +105,7 @@ export default function ey({
       }
     }
 
-    if (!listening || r[$.state] >= 3) // Ensure we only use default in listening router
+    if (!handle || r[$.state] >= 3) // Ensure we only use default in handle router
       return
 
     hasOwn.call(r, $.error)
@@ -145,23 +145,22 @@ export default function ey({
             }
           )
         )
-        uws.any('/*', handle)
+        uws.any('/*', handler)
 
         address
           ? uws.listen(address, port, callback)
           : uws.listen(port, o, callback)
 
-        function callback(handle) {
-          if (!handle)
+        function callback(x) {
+          if (!x)
             return reject(new Error('Could not listen on', port))
 
-          listening = true
-          listener = handle
+          handle = x
           resolve({ port: uWS.us_socket_local_port(handle), handle, unlisten })
         }
 
         function unlisten() {
-          listener && uWS.us_listen_socket_close(listener)
+          handle && uWS.us_listen_socket_close(handle)
         }
 
         function handler(res, req) {
