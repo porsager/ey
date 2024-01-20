@@ -118,9 +118,6 @@ export default function ey({
   function listen(defaultOptions) {
     return (port, address, options) => {
       return new Promise((resolve, reject) => {
-        let address
-          , listener
-
         typeof address === 'object' && (options = address, address = null)
         const o = {
           ...defaultOptions,
