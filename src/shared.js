@@ -25,6 +25,7 @@ export const symbols = {
   options: Symbol('options'),
   reading: Symbol('reading'),
   working: Symbol('working'),
+  protocol: Symbol('protocol'),
   readable: Symbol('readable'),
   writable: Symbol('writable'),
   readBody: Symbol('readBody'),

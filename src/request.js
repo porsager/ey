@@ -35,7 +35,7 @@ const caches = {
 }
 
 export default class Request {
-  constructor(res, req, options = {}) {
+  constructor(res, req, protocol) {
     this.method = req.getMethod()
     try {
       this.url = decodeURIComponent(req.getUrl())
@@ -49,6 +49,7 @@ export default class Request {
     this.paused = false
     this.last = null
     this.rawQuery = req.getQuery() || ''
+    this[$.protocol] = protocol
     this[$.res] = res
     this[$.req] = req
     this[$.state] = 1
@@ -143,6 +144,10 @@ export default class Request {
       this[$.state] = state.ENDED
       this[$.abort] && this[$.abort].forEach(x => x())
     })
+  }
+
+  get protocol() {
+    return this[$.protocol] || this.headers['x-forwarded-proto']
   }
 
   get query() {

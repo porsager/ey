@@ -76,8 +76,8 @@ export default function ey({
     return router
   }
 
-  async function router(res, req) {
-    const r = res instanceof Request ? res : new Request(res, req)
+  async function router(res, req, protocol) {
+    const r = res instanceof Request ? res : new Request(res, req, protocol)
     const method = handlers.has(r.method) ? handlers.get(r.method) : handlers.get('all')
 
     for (const x of method) {
@@ -164,9 +164,8 @@ export default function ey({
           listener && uWS.us_listen_socket_close(listener)
         }
 
-        function handle(res, req) {
-          res.options = o
-          router(res, req)
+        function handler(res, req) {
+          router(res, req, o.cert ? 'https' : 'http')
         }
       })
     }
@@ -349,8 +348,7 @@ function prepareArray(match, sub) {
 function upgrader(options, pattern, handlers) {
   handlers.headers && handlers.headers.push('sec-websocket-key', 'sec-websocket-protocol', 'sec-websocket-extensions')
   return async function(res, req, context) {
-    res.options = options
-    const r = new Request(res, req)
+    const r = new Request(res, req, options.cert ? 'https' : 'http')
     ;(pattern.match(/\/:([^/]+|$)/g) || []).map((x, i) => r.params[x.slice(2)] = res.getParameter(i))
     r[$.readHeaders](handlers)
     let error
