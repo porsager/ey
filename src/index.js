@@ -306,6 +306,7 @@ function prepare(match, sub) {
 function prepareString(match, sub) {
   const named = match.match(/\/:([a-z][a-z0-9_]*)?/g)
       , wildcard = match.indexOf('*') !== -1
+
   if (!named && !wildcard) {
     return sub
       ? (r) => r.url.indexOf(match) === 0 && match
@@ -314,7 +315,7 @@ function prepareString(match, sub) {
 
   const names = named && named.map(n => n.slice(2))
   const regex = new RegExp(
-       '^(?:'
+       '^('
      + match.replace(/:.+?(\/|$)/g, '([^/]+?)$1').replace(/\*/, '.*?')
      + ')'
      + (sub ? '(/|$)' : '$')
@@ -322,7 +323,7 @@ function prepareString(match, sub) {
 
   return function(r) {
     const result = r.url.match(regex)
-    result && names && names.forEach((n, i) => r.params[n] = decodeURIComponent(result[i + 1]))
+    result && names && names.forEach((n, i) => r.params[n] = decodeURIComponent(result[i + 2]))
     return result && result[1]
   }
 }
