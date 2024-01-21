@@ -161,6 +161,7 @@ export default function ey({
         }
 
         function handler(res, req) {
+          res.options = o
           router(res, req, o.cert ? 'https' : 'http')
         }
       })
@@ -344,6 +345,7 @@ function prepareArray(match, sub) {
 function upgrader(options, pattern, handlers) {
   handlers.headers && handlers.headers.push('sec-websocket-key', 'sec-websocket-protocol', 'sec-websocket-extensions')
   return async function(res, req, context) {
+    res.options = options
     const r = new Request(res, req, options.cert ? 'https' : 'http')
     ;(pattern.match(/\/:([^/]+|$)/g) || []).map((x, i) => r.params[x.slice(2)] = res.getParameter(i))
     r[$.readHeaders](handlers)
