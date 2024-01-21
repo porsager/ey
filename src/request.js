@@ -146,6 +146,10 @@ export default class Request {
     })
   }
 
+  get secure() {
+    return this.protocol === 'https'
+  }
+
   get protocol() {
     return this[$.protocol] || this.headers['x-forwarded-proto']
   }
