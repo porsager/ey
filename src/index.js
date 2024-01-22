@@ -1,4 +1,5 @@
 import { symbols as $, hasOwn, state } from './shared.js'
+import fs from 'node:fs'
 import Request from './request.js'
 import files from './files.js'
 import mimes from './mimes.js'
@@ -123,6 +124,9 @@ export default function ey({
           ...defaultOptions,
           ...(options || {})
         }
+
+        // Prettier errors than uws if missing
+        o.cert && fs.accessSync(o.cert, fs.constants.R_OK) && fs.accessSync(o.key || 'private.key', fs.constants.R_OK)
 
         port = parseInt(port)
         uws = o.cert
