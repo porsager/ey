@@ -1,37 +1,10 @@
-import { symbols as $, hasOwn, state } from './shared.js'
+import { symbols as $, hasOwn, isPromise } from './shared.js'
 import fs from 'node:fs'
 import Request from './request.js'
 import files from './files.js'
 import mimes from './mimes.js'
-
+import { Websocket, Message } from './ws.js'
 import uWS from 'uWebSockets.js'
-
-class Message {
-  constructor(data, binary) {
-    this.data = data
-    this.binary = binary
-  }
-  get buffer() { return Buffer.from(this.data) }
-  get json() { return tryJSON(this.data) }
-  get text() { return Buffer.from(this.data).toString() }
-}
-
-const monkey = {
-  close() { return this.open && this._close.apply(this, arguments) },
-  cork() { return this.open && this._cork.apply(this, arguments) },
-  end() { return this.open && this._end.apply(this, arguments) },
-  getBufferedAmount() { return this.open && this._getBufferedAmount.apply(this, arguments) },
-  getRemoteAddress() { return this.open && this._getRemoteAddress.apply(this, arguments) },
-  getRemoteAddressAsText() { return this.open && this._getRemoteAddressAsText.apply(this, arguments) },
-  getTopics() { return this.open && this._getTopics.apply(this, arguments) },
-  getUserData() { return this.open && this._getUserData.apply(this, arguments) },
-  isSubscribed() { return this.open && this._isSubscribed.apply(this, arguments) },
-  ping() { return this.open && this._ping.apply(this, arguments) },
-  publish() { return this.open && this._publish.apply(this, arguments) },
-  send() { return this.open && this._send.apply(this, arguments) },
-  subscribe() { return this.open && this._subscribe.apply(this, arguments) },
-  unsubscribe() { return this.open && this._unsubscribe.apply(this, arguments) }
-}
 
 export default function ey({
   methods = ['head', 'get', 'put', 'post', 'delete', 'patch', 'options', 'trace', 'all'],
@@ -66,23 +39,16 @@ export default function ey({
 
   return router
 
-  function route(...xs) {
-    const x = xs.pop()
-    if (typeof x !== 'function')
-      return ey(x)
+  async function router(r) {
+    if (r.ended)
+      return
 
-    const app = ey()
-    x(app)
-    router.all(...xs, app)
-    return router
-  }
-
-  async function router(res, req, protocol) {
-    const r = res instanceof Request ? res : new Request(res, req, protocol)
-    const method = handlers.has(r.method) ? handlers.get(r.method) : handlers.get('all')
+    const method = handlers.has(r.method)
+      ? handlers.get(r.method)
+      : handlers.get('all')
 
     for (const x of method) {
-      if (r[$.state] >= 3)
+      if (r.ended)
         break
 
       if (hasOwn.call(r, $.error) !== x.error)
@@ -93,27 +59,44 @@ export default function ey({
         continue
 
       try {
-        r[$.req] && r[$.readHeaders](x.options)
-        r.last = x.handler({ error: r[$.error], r, match })
-        if (r.last && typeof r.last.then === 'function') {
-          r.method.charCodeAt(0) === 112 && r[$.readBody](true)
+        let response = x.handler({ error: r[$.error], r, match })
+        if (isPromise(response)) {
           r.onAborted()
-          r.last = await r.last
+          response = await response
         }
-        r[$.working] && (r.onAborted(), await r[$.working])
+        if (response instanceof Response)
+          return await r.end(response)
+        else
+          r.response = response
       } catch (error) {
         r[$.error] = error
       }
     }
 
-    if (!handle || r[$.state] >= 3) // Ensure we only use default in handle router
+    if (!handle) // Ensure we only use fallback responses in root listen router
+      return
+
+    if (r.ended)
       return
 
     hasOwn.call(r, $.error)
       ? r[$.error] instanceof URIError
-        ? (r.end('Bad URI', 400), console.error(400, r.url, '->', r[$.error]))
-        : (r.statusEnd(500), console.error(500, 'Uncaught route error', r[$.error]))
-      : r.statusEnd(404)
+        ? (r.end('Bad URI', 400), console.error(400, r.url, '->', r[$.error])) // eslint-disable-line
+        : (r.end(r[$.error].stack, 500), console.error(500, 'Uncaught route error', r[$.error])) // eslint-disable-line
+      : r.response instanceof Response
+        ? r.end(r.response.body, r.response.status || 200 + (r.response.statusText ? ' ' + r.response.statusText : ''), r.response.headers)
+        : r.statusEnd(404)
+  }
+
+  function route(...xs) {
+    const x = xs.pop()
+    if (typeof x !== 'function')
+      return ey(x)
+
+    const app = ey()
+    x(app)
+    router.all(...xs, app)
+    return router
   }
 
   function listen(defaultOptions) {
@@ -146,7 +129,7 @@ export default function ey({
             }
           )
         )
-        uws.any('/*', handler)
+        uws.any('/*', wrap)
 
         address
           ? uws.listen(address, port, callback)
@@ -164,9 +147,8 @@ export default function ey({
           handle && uWS.us_listen_socket_close(handle)
         }
 
-        function handler(res, req) {
-          res.options = o
-          router(res, req, o.cert ? 'https' : 'http')
+        function wrap(res, req) {
+          router(new Request(res, req, o))
         }
       })
     }
@@ -190,20 +172,19 @@ export default function ey({
   }
 
   function close(fn, ws, code, data) {
+    fn(ws[$.ws], code, new Message(data, true))
     ws.open = false
-    return fn(ws, code, new Message(data, true))
   }
 
   function open(fn, ws) {
-    patch(ws)
-    return fn(ws)
+    fn(ws[$.ws] = new Websocket(ws))
   }
 
   function message(fn, ws, data, binary) {
-    return fn(ws, new Message(data, binary))
+    fn(ws[$.ws], new Message(data, binary))
   }
 
-  function catcher(name, handlers, fn = (fn, ...ws) => fn(...ws)) {
+  function catcher(name, handlers, fn = (fn, ws, ...xs) => fn(ws[$.ws], ...xs)) {
     if (!(name in handlers))
       return
 
@@ -213,7 +194,7 @@ export default function ey({
         fn(method, ws, ...xs)
       } catch (error) {
         name === 'close' || ws.end(1011, 'Internal Server Error')
-        console.error(500, 'Uncaught ' + name + ' error', error)
+        console.error(500, 'Uncaught ' + name + ' error', error) // eslint-disable-line
       }
     }
   }
@@ -327,7 +308,7 @@ function prepareString(match, sub) {
 
   return function(r) {
     const result = r.url.match(regex)
-    result && names && names.forEach((n, i) => r.params[n] = decodeURIComponent(result[i + 2]))
+    result && names && (r.params === null || (r.params = {}), names.forEach((n, i) => r.params[n] = decodeURIComponent(result[i + 2])))
     return result && result[1]
   }
 }
@@ -348,12 +329,14 @@ function prepareArray(match, sub) {
 }
 
 function upgrader(options, pattern, handlers) {
-  handlers.headers && handlers.headers.push('sec-websocket-key', 'sec-websocket-protocol', 'sec-websocket-extensions')
+  handlers.headers
+    ? handlers.headers.push('sec-websocket-key', 'sec-websocket-protocol', 'sec-websocket-extensions')
+    : handlers.headers === false && (handlers.headers = ['sec-websocket-key', 'sec-websocket-protocol', 'sec-websocket-extensions'])
+
   return async function(res, req, context) {
     res.options = options
-    const r = new Request(res, req, options.cert ? 'https' : 'http')
+    const r = new Request(res, req, { ...options, headers: handlers.headers })
     ;(pattern.match(/\/:([^/]+|$)/g) || []).map((x, i) => r.params[x.slice(2)] = res.getParameter(i))
-    r[$.readHeaders](handlers)
     let error
       , data
     try {
@@ -361,10 +344,10 @@ function upgrader(options, pattern, handlers) {
       data && typeof data.then === 'function' && (r.onAborted(), data = await data)
     } catch (err) {
       error = err
-      console.error(500, 'Uncaught upgrade error', error)
+      console.error(500, 'Uncaught upgrade error', error) // eslint-disable-line
     }
 
-    if (r[$.state] === state.ENDED)
+    if (r.ended)
       return
 
     if (error)
@@ -373,7 +356,7 @@ function upgrader(options, pattern, handlers) {
     r.status(101)
     r.cork(() =>
       res.upgrade(
-        data || {},
+        { data },
         r.headers['sec-websocket-key'],
         r.headers['sec-websocket-protocol'],
         r.headers['sec-websocket-extensions'],
@@ -381,31 +364,4 @@ function upgrader(options, pattern, handlers) {
       )
     )
   }
-}
-
-function tryJSON(data) {
-  try {
-    return JSON.parse(Buffer.from(data))
-  } catch (x) {
-    return undefined
-  }
-}
-
-function patch(ws) {
-  ws.open = true
-  ws._close = ws.close
-  ws._cork = ws.cork
-  ws._end = ws.end
-  ws._getBufferedAmount = ws.getBufferedAmount
-  ws._getRemoteAddress = ws.getRemoteAddress
-  ws._getRemoteAddressAsText = ws.getRemoteAddressAsText
-  ws._getTopics = ws.getTopics
-  ws._getUserData = ws.getUserData
-  ws._isSubscribed = ws.isSubscribed
-  ws._ping = ws.ping
-  ws._publish = ws.publish
-  ws._send = ws.send
-  ws._subscribe = ws.subscribe
-  ws._unsubscribe = ws.unsubscribe
-  Object.assign(ws, monkey)
 }

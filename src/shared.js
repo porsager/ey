@@ -1,34 +1,33 @@
 export const hasOwn = {}.hasOwnProperty
 
-export const state = {
-  OPEN: 1,
-  RECEIVING: 2,
-  SENT_STATUS: 3,
-  SENT_HEADERS: 4,
-  ENDED: 5
+export function isPromise(x) {
+  return x && typeof x.then === 'function'
+}
+
+export function copy(x) {
+  const copy = new Uint8Array(x.length)
+  copy.set(x)
+  return copy
 }
 
 export const symbols = {
   ip: Symbol('ip'),
+  ws : Symbol('ws'),
   req: Symbol('req'),
   res: Symbol('res'),
   body: Symbol('body'),
   data: Symbol('data'),
-  abort: Symbol('abort'),
+  head: Symbol('head'),
+  ended: Symbol('ended'),
   error: Symbol('error'),
   query: Symbol('query'),
-  state: Symbol('state'),
+  corked: Symbol('corked'),
+  length: Symbol('length'),
   onData: Symbol('onData'),
   status: Symbol('status'),
-  corked: Symbol('corked'),
+  aborted: Symbol('aborted'),
   headers: Symbol('headers'),
-  options: Symbol('options'),
   reading: Symbol('reading'),
-  working: Symbol('working'),
-  protocol: Symbol('protocol'),
   readable: Symbol('readable'),
-  writable: Symbol('writable'),
-  readBody: Symbol('readBody'),
-  headersRead: Symbol('headers'),
-  readHeaders: Symbol('readHeaders')
+  writable: Symbol('writable')
 }

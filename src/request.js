@@ -6,10 +6,12 @@ import { promisify }            from 'node:util'
 import path                     from 'node:path'
 import { STATUS_CODES }         from 'node:http'
 import { Readable, Writable }   from 'node:stream'
+import { pipeline }             from 'node:stream/promises'
 
 import mimes, { compressable }  from './mimes.js'
-import { state, symbols as $ }  from './shared.js'
+import { symbols as $, copy, isPromise }  from './shared.js'
 
+const stateSymbol = Object.getOwnPropertySymbols(new Response()).find(sym => sym.toString() === 'Symbol(state)')
 const cwd = process.cwd()
 const ipv4 = Buffer.from('00000000000000000000ffff', 'hex')
 
@@ -35,7 +37,8 @@ const caches = {
 }
 
 export default class Request {
-  constructor(res, req, protocol) {
+  constructor(res, req, options) {
+    this.options = options
     this.method = req.getMethod()
     try {
       this.url = decodeURIComponent(req.getUrl())
@@ -44,66 +47,47 @@ export default class Request {
       this[$.error] = error
     }
     this.pathname = this.url
-    this.params = {}
-    this.headers = {}
-    this.paused = false
     this.last = null
+    this.ended = false
+    this.paused = false
+    this.aborted = false
+    this.sentStatus = false
+    this.sentHeaders = false
     this.rawQuery = req.getQuery() || ''
-    this[$.protocol] = protocol
+    this[$.ip] = null
     this[$.res] = res
     this[$.req] = req
-    this[$.state] = 1
-    this[$.corked] = false
+    this[$.body] = null
+    this[$.data] = null
+    this[$.head] = null
+    this[$.ended] = null
     this[$.query] = null
+    this[$.length] = null
+    this[$.status] = null
+    this[$.corked] = false
+    this[$.onData] = null
+    this[$.aborted] = null
+    this[$.headers] = null
+    this[$.reading] = null
     this[$.readable] = null
     this[$.writable] = null
-    this[$.abort] = null
-    this[$.status] = null
-    this[$.headers] = null
-    this[$.headersRead] = null
-    this[$.onData] = null
-    this[$.data] = null
-    this[$.reading] = null
-    this[$.body] = null
-    this[$.ip] = null
   }
 
   async onData(fn) {
     this[$.onData] = fn
-
     if (this[$.data] !== null) {
-      this[$.data].forEach(x => fn(x))
+      this[$.data].forEach(({ buffer, last }) => fn(buffer, last))
       this[$.data] = null
     }
-
-    return this[$.readBody](false)
-  }
-
-  [$.readBody](buffer) {
-    if (this[$.state] > state.RECEIVING)
-        return
-
-    if (this[$.reading])
-      return this[$.reading]
-
-    buffer && (this[$.data] = [])
-    return this[$.reading] = this[$.working] = new Promise((resolve, reject) => {
-      this[$.res].onData((data, isLast) => {
-        this[$.onData]
-          ? this[$.onData](Buffer.from(data), isLast)
-          : this[$.data].push(Buffer.from(Buffer.from(data)))
-        isLast && resolve()
-      })
-    }).finally(() =>
-      this[$.reading] = this[$.working] = null
-    )
+    return read(this)
   }
 
   async body(type) {
     if (this[$.body] !== null)
       return this[$.body]
 
-    const length = parseInt(this.headers['content-length'] || '')
+    const length = parseInt(header(this, 'content-length'))
+        , contentType = header(this, 'content-type')
         , known = Number.isNaN(length) === false
 
     let full = known
@@ -111,39 +95,46 @@ export default class Request {
       : []
 
     let offset = 0
-
-    await this.onData(buffer => {
+    return this[$.body] = this.onData(buffer => {
       known
-        ? buffer.copy(full, offset)
+        ? Buffer.from(buffer).copy(full, offset)
         : full.push(buffer)
-      offset += buffer.length
+      offset += buffer.byteLength
+    }).then(() => {
+      known || (full = Buffer.concat(full))
+      if (known && offset !== full.byteLength)
+        throw new Error('Expected data of length', full.byteLength, 'but only got', offset)
+
+      return this[$.body] = type === 'json'
+        ? JSON.parse(full)
+        : type === 'text'
+        ? full.toString()
+        : type === 'multipart'
+        ? uWS.getParts(full, contentType)
+        : full
     })
-
-    known || (full = Buffer.concat(full))
-
-    if (known && offset !== full.length)
-      throw new Error('Expected data of length', full.length, 'but only got', offset)
-
-    return this[$.body] = type === 'json'
-      ? JSON.parse(full)
-      : type === 'text'
-      ? full.toString()
-      : type === 'multipart'
-      ? uWS.getParts(full, this.headers['content-type'])
-      : full
   }
 
   onAborted(fn) {
-    fn && (this[$.abort] ? this[$.abort].push(fn) : this[$.abort] = [fn])
+    fn && (this[$.aborted] ? this[$.aborted].push(fn) : this[$.aborted] = [fn])
     if (!this[$.req])
       return
 
+    this.method.charCodeAt(0) === 112 && read(this) // (p) cache reading on post, put, patch
     this.ip // ensure IP is read on first tick
     this[$.req] = null
-    return this[$.res].onAborted(() => {
-      this[$.state] = state.ENDED
-      this[$.abort] && this[$.abort].forEach(x => x())
-    })
+    return this[$.res].onAborted(() => aborted(this))
+  }
+
+  get headers() {
+    if (this[$.head] !== null)
+      return this[$.head]
+
+    this.options.headers != null
+      ? (this.options.headers && (this[$.head] = {}), this.options.headers.forEach(k => this[$.head][k] = this[$.req].getHeader(k)))
+      : (this[$.head] = {}, this[$.req].forEach((k, v) => this[$.head][k] = v))
+
+    return this[$.head]
   }
 
   get secure() {
@@ -151,7 +142,9 @@ export default class Request {
   }
 
   get protocol() {
-    return this[$.protocol] || this.headers['x-forwarded-proto']
+    return this.options.cert
+      ? 'https'
+      : header(this, 'x-forwarded-proto')
   }
 
   get query() {
@@ -164,7 +157,7 @@ export default class Request {
     if (this[$.ip] !== null)
       return this[$.ip]
 
-    const proxyIP = this.headers['x-forwarded-for']
+    const proxyIP = header(this, 'x-forwarded-for')
         , remoteIP = Buffer.from(this[$.res].getRemoteAddress())
 
     return this[$.ip] = (proxyIP
@@ -193,7 +186,7 @@ export default class Request {
     async function start() {
       try {
         await r.onData(buffer =>
-          stream.push(r[$.data] ? buffer : Buffer.from(buffer)) || r.pause()
+          stream.push(Buffer.from(buffer)) || r.pause()
         )
         r.resume()
         stream.push(null)
@@ -231,14 +224,14 @@ export default class Request {
   }
 
   resume() {
-    if (!this.paused || this[$.state] === state.ENDED)
+    if (!this.paused || this.ended)
       return
     this.paused = false
     this[$.res].resume()
   }
 
   pause() {
-    if (this.paused || this[$.state] === state.ENDED)
+    if (this.paused || this.ended)
       return
     this.paused = true
     this[$.res].pause()
@@ -262,35 +255,54 @@ export default class Request {
     )
   }
 
-  [$.readHeaders](options = {}) {
-    if (!this[$.req] || this[$.headersRead])
-      return
-
-    options.headers
-      ? options.headers.forEach(k => this.headers[k] = this[$.req].getHeader(k))
-      : (this[$.headersRead] = true, this[$.req].forEach((k, v) => this.headers[k] = v))
+  onEnded(fn) {
+    this[$.ended] === null
+      ? this[$.ended] = [fn]
+      : this[$.ended].push(fn)
   }
 
   close() {
-    this[$.state] = state.ENDED
     this[$.res].close()
+    ended(this)
     return this
   }
 
   end(x, status, headers) {
-    typeof status === 'object' && (headers = status, status = null)
-    status && this.status(status)
-    headers && this.header(headers)
-    this.cork(() => {
-      this[$.state] = state.ENDED
+    x instanceof Response
+      ? (
+        this.status(x.status),
+        x.headers.forEach((v, h) => this.header(h, v))
+      )
+      : (
+        typeof status === 'object' && (headers = status, status = null),
+        status && this.status(status),
+        headers && this.header(headers)
+      )
 
-      if (this.method !== 'head')
-        return this[$.res].end(x)
-
-      x && this[$.res].writeHeader('Content-Length', '' + Buffer.byteLength(x))
-      this[$.res].endWithoutBody()
+    return this.cork(async() => {
+      if (this.method === 'head') {
+        x instanceof Response
+          ? x[stateSymbol].body.length !== undefined && !x.headers.has('content-length') && this[$.res].writeHeader('Content-Length', '' + x[stateSymbol].body.length)
+          : x && this[$.length] === null && this[$.res].writeHeader('Content-Length', '' + Buffer.byteLength(x))
+        this[$.res].endWithoutBody()
+      } else if (x instanceof Response) {
+        const length = this[$.length] === null ? x[stateSymbol].body.length !== undefined && x[stateSymbol].body.length : this[$.length]
+        length === 0
+          ? this[$.res].end()
+          : length
+          ? await streamEnd(this, Readable.fromWeb(x.body), length)
+          : await pipeline(Readable.fromWeb(x.body), this.writable)
+      } else if (x instanceof Readable) {
+        this[$.length] === 0
+          ? this[$.res].end()
+          : this[$.length]
+          ? await streamEnd(this, x, this[$.length])
+          : await pipeline(x, this.writable)
+      } else {
+        this[$.res].end(x)
+      }
+      ended(this)
     })
-    return this
   }
 
   statusEnd(status, headers) {
@@ -310,10 +322,10 @@ export default class Request {
     }
     typeof h === 'object'
       ? Object.entries(h).forEach(xs => this.header(...xs))
-      : v && (this[$.headers]
+      : (h.toLowerCase() === 'content-length' && (this[$.length] = v), (v || v === 0) && (this[$.headers]
         ? this[$.headers].push(['' + h, '' + v])
         : this[$.headers] = [['' + h, '' + v]]
-      )
+      ))
     return this
   }
 
@@ -322,7 +334,7 @@ export default class Request {
   }
 
   cork(fn) {
-    if (this[$.state] === state.ENDED)
+    if (this.ended)
       return
 
     if (this[$.corked])
@@ -330,16 +342,16 @@ export default class Request {
 
     let result
     this[$.res].cork(() => {
-      if (this[$.state] < state.SENT_HEADERS) {
-        if (this[$.state] < state.SENT_STATUS) {
-          this[$.state] = state.SENT_STATUS
+      if (!this.sentHeaders) {
+        if (!this.sentStatus) {
+          this.sentStatus = true
           const status = this[$.status]
           status && this[$.res].writeStatus(typeof status === 'number'
             ? status + (status in STATUS_CODES ? ' ' + STATUS_CODES[status] : '')
             : status
           )
         }
-        this[$.state] = state.SENT_HEADERS
+        this.sentHeaders = true
         this[$.headers] && this[$.headers].forEach(([header, value]) => {
           value && this[$.res].writeHeader(
             header,
@@ -355,7 +367,7 @@ export default class Request {
   }
 
   getWriteOffset() {
-    return this[$.state] === state.ENDED
+    return this.ended
       ? -1
       : this[$.res].getWriteOffset()
   }
@@ -370,29 +382,29 @@ export default class Request {
   }
 
   tryEnd(x, total) {
-    if (this[$.state] === state.ENDED)
+    if (this.ended)
       return [true, true]
 
     try {
       return this.cork(() => {
         if (this.method === 'head') {
-          this[$.state] = state.ENDED
+          ended(this)
           this[$.res].endWithoutBody(total)
           return [true, true]
         }
 
         const xs = this[$.res].tryEnd(x, total)
-        xs[1] && (this[$.state] = state.ENDED)
+        xs[1] && ended(this)
         return xs
       })
     } catch (err) {
-      this[$.state] = state.ENDED
+      ended(this)
       return [true, true]
     }
   }
 
   write(x) {
-    if (this[$.state] === state.ENDED)
+    if (this.ended)
       return true
 
     return this.cork(() =>
@@ -423,8 +435,8 @@ export default class Request {
     }, options)
 
     file = path.isAbsolute(file) ? file : path.join(cwd, file)
-    const compressions = options.compressions ?? this[$.res].options.compressions
-        , cache = options.cache || this[$.res].options.cache
+    const compressions = options.compressions || this.options.compressions
+        , cache = options.cache || this.options.cache
         , ext = path.extname(file).slice(1)
         , type = mimes.get(ext)
 
@@ -434,16 +446,14 @@ export default class Request {
 
     return cache && caches[compressor || 'identity'].has(file)
       ? this.end(...caches[compressor || 'identity'].get(file))
-      : read(this, file, type, compressor, options)
+      : readFile(this, file, type, compressor, options)
   }
 }
 
-async function read(r, file, type, compressor, o) {
+async function readFile(r, file, type, compressor, o) {
   r.onAborted()
   let handle
-    , resolve
 
-  r[$.working] = new Promise(r => resolve = r)
   try {
     handle = await fsp.open(file)
     const stat = await handle.stat()
@@ -452,7 +462,7 @@ async function read(r, file, type, compressor, o) {
       compressor = null
 
     if (r.headers.range || (stat.size >= o.minStreamSize && stat.size > o.maxCacheSize))
-      return await stream(r, file, type, { handle, stat, compressor }, o)
+      return await stream(r, type, { handle, stat, compressor }, o)
 
     let bytes = await handle.readFile()
 
@@ -461,7 +471,7 @@ async function read(r, file, type, compressor, o) {
 
     if (o.transform) {
       bytes = o.transform(bytes, file, type, r)
-      if (bytes && typeof bytes.then === 'function')
+      if (isPromise(bytes))
         bytes = await bytes
     }
 
@@ -479,12 +489,11 @@ async function read(r, file, type, compressor, o) {
     o.cache && stat.size < o.maxCacheSize && caches[compressor || 'identity'].set(file, response)
     r.end(...response)
   } finally {
-    resolve()
     handle && handle.close()
   }
 }
 
-async function stream(r, file, type, { handle, stat, compressor }, options) {
+async function stream(r, type, { handle, stat, compressor }, options) {
   const { size, mtime } = stat
       , range = r.headers.range || ''
       , highWaterMark = options.highWaterMark || options.minStreamSize
@@ -538,6 +547,41 @@ async function streamRaw(r, handle, highWaterMark, total, start) {
         return ok
       })
     })
+  }
+}
+
+async function streamEnd(r, stream, total) {
+  let lastOffset = 0
+    , resolve
+    , reject
+    , promise = new Promise((r, e) => (resolve = r, reject = e))
+
+  stream.on('readable', read)
+  stream.on('error', reject)
+
+  read()
+
+  return promise
+
+  function read() {
+    let buffer
+    while (null !== (buffer = stream.read())) {
+      lastOffset = r.getWriteOffset()
+      const [ok, last] = r.tryEnd(buffer, total)
+      if (last)
+        return resolve()
+
+      if (!ok) {
+        stream.pause()
+        r.onWritable(offset => {
+          const [ok, last] = r.tryEnd(buffer.subarray(offset - lastOffset), total)
+          last
+            ? resolve()
+            : ok && stream.resume()
+          return ok
+        })
+      }
+    }
   }
 }
 
@@ -603,4 +647,37 @@ function getCookie(name, x) {
 
   const xs = x.match('(?:^|; )' + name + '=([^;]+)(;|$)')
   return xs ? decodeURIComponent(xs[1]) : null
+}
+
+function aborted(r) {
+  r.aborted = true
+  r[$.aborted] === null || r[$.aborted].forEach(x => x())
+  ended(r)
+}
+
+function ended(r) {
+  r.ended = true
+  r[$.ended] === null || r[$.ended].forEach(x => x())
+}
+
+function header(r, header) {
+  return r[$.req] && r[$.req].getHeader(header) || r.headers[header] || ''
+}
+
+function read(r) {
+  if (r[$.reading] !== null)
+    return r[$.reading]
+
+  return r[$.reading] = new Promise((resolve, reject) =>
+    r[$.res].onData((x, last) => {
+      try {
+        r[$.onData]
+          ? r[$.onData](x, last)
+          : (r[$.data] === null && (r[$.data] = []), r[$.data].push({ buffer: copy(x), last })) // must copy - uws clears memory in next tick
+        last && resolve()
+      } catch (error) {
+        reject(error)
+      }
+    })
+  )
 }
