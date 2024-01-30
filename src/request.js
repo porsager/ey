@@ -668,7 +668,7 @@ function read(r) {
   if (r[$.reading] !== null)
     return r[$.reading]
 
-  return r[$.reading] = new Promise((resolve, reject) =>
+  return r.ended || (r[$.reading] = new Promise((resolve, reject) =>
     r[$.res].onData((x, last) => {
       try {
         r[$.onData]
@@ -679,5 +679,5 @@ function read(r) {
         reject(error)
       }
     })
-  )
+  ))
 }
