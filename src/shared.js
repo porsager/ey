@@ -29,5 +29,6 @@ export const symbols = {
   headers: Symbol('headers'),
   reading: Symbol('reading'),
   readable: Symbol('readable'),
-  writable: Symbol('writable')
+  writable: Symbol('writable'),
+  responding: Symbol('responding'),
 }

@@ -40,7 +40,7 @@ export default function ey({
   return router
 
   async function router(r) {
-    if (r.ended)
+    if (r.responding)
       return
 
     const method = handlers.has(r.method)
@@ -48,7 +48,7 @@ export default function ey({
       : handlers.get('all')
 
     for (const x of method) {
-      if (r.ended)
+      if (r.responding)
         break
 
       if (hasOwn.call(r, $.error) !== x.error)
@@ -76,7 +76,7 @@ export default function ey({
     if (!handle) // Ensure we only use fallback responses in root listen router
       return
 
-    if (r.ended)
+    if (r.responding)
       return
 
     hasOwn.call(r, $.error)
