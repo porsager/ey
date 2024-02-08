@@ -6,7 +6,7 @@ const notFound = x => x.code === 'ENOENT' || x.code === 'EISDIR'
 const hasOwn = {}.hasOwnProperty
 
 export default function(Ey) {
-  return function files(folder, o) {
+  return function files(folder, o = {}) {
     if (!o && typeof folder !== 'string') {
       o = folder || {}
       folder = ''
