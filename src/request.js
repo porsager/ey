@@ -465,42 +465,42 @@ async function readFile(r, file, type, compressor, o) {
 
   try {
     handle = await fsp.open(file)
-  } catch(error) {
-    if (!o.fallthrough || (x.code === 'ENOENT' || x.code === 'EISDIR'))
+  } catch (error) {
+    if (!o.fallthrough || (error.code === 'ENOENT' || error.code === 'EISDIR'))
       throw error
   }
 
-    const stat = await handle.stat()
+  const stat = await handle.stat()
 
-    if (stat.size < o.minCompressSize)
-      compressor = null
+  if (stat.size < o.minCompressSize)
+    compressor = null
 
-    if (r.headers.range || (stat.size >= o.minStreamSize && stat.size > o.maxCacheSize))
-      return stream(r, type, { handle, stat, compressor }, o).finally(() => handle.close())
+  if (r.headers.range || (stat.size >= o.minStreamSize && stat.size > o.maxCacheSize))
+    return stream(r, type, { handle, stat, compressor }, o).finally(() => handle.close())
 
-    let bytes = await handle.readFile()
+  let bytes = await handle.readFile()
 
-    handle.close()
+  handle.close()
 
-    if (o.transform) {
-      bytes = o.transform(bytes, file, type, r)
-      if (isPromise(bytes))
-        bytes = await bytes
-    }
+  if (o.transform) {
+    bytes = o.transform(bytes, file, type, r)
+    if (isPromise(bytes))
+      bytes = await bytes
+  }
 
-    if (compressor)
-      bytes = await compressors[compressor](bytes)
+  if (compressor)
+    bytes = await compressors[compressor](bytes)
 
-    const headers = {
-      ETag: createEtag(stat.mtime, stat.size, compressor),
-      'Last-Modified': stat.mtime.toUTCString(),
-      'Content-Encoding': compressor,
-      'Content-Type': type
-    }
+  const headers = {
+    ETag: createEtag(stat.mtime, stat.size, compressor),
+    'Last-Modified': stat.mtime.toUTCString(),
+    'Content-Encoding': compressor,
+    'Content-Type': type
+  }
 
-    const response = [bytes, 200, headers]
-    o.cache && stat.size < o.maxCacheSize && caches[compressor || 'identity'].set(file, response)
-    r.end(...response)
+  const response = [bytes, 200, headers]
+  o.cache && stat.size < o.maxCacheSize && caches[compressor || 'identity'].set(file, response)
+  r.end(...response)
 }
 
 function stream(r, type, { handle, stat, compressor }, options) {
@@ -583,13 +583,13 @@ async function streamEnd(r, stream, total) {
 
       if (!ok) {
         stream.pause()
-        r.onWritable(offset => {
-          const [ok, last] = r.tryEnd(buffer.subarray(offset - lastOffset), total)
-          last
-            ? resolve()
+          r.onWritable(offset => {
+            const [ok, last] = r.tryEnd(buffer.subarray(offset - lastOffset), total)
+            last
+              ? resolve()
             : ok && stream.resume()
-          return ok
-        })
+            return ok
+          })
       }
     }
   }

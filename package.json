@@ -11,7 +11,7 @@
     "node": ">=16"
   },
   "scripts": {
-    "test": "echo some day"
+    "test": "eslint ."
   },
   "bin": {
     "ey": "./bin/index.js"

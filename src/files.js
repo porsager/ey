@@ -43,7 +43,7 @@ export default function(Ey) {
         await r.file(url)
         rewrites.set(trimSlash(r.pathname), url)
       } catch (error) {
-        if (!fallthrough || !notFound(error))
+        if (!o.fallthrough || !notFound(error))
           throw error
 
         if (r.ended || !trimSlash(r.url))
@@ -53,7 +53,7 @@ export default function(Ey) {
           await r.file(url = resolve(r.url + '.html'))
           rewrites.set(trimSlash(r.pathname), url)
         } catch (error) {
-          if (!fallthrough || !notFound(error))
+          if (!o.fallthrough || !notFound(error))
             throw error
         }
       }
