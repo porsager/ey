@@ -117,10 +117,10 @@ export default class Request {
   }
 
   onAborted(fn) {
-    fn && (this[$.aborted] ? this[$.aborted].push(fn) : this[$.aborted] = [fn])
-    if (!this[$.req])
-      return
+    if (this[$.aborted])
+      return fn && this[$.aborted].push(fn)
 
+    this[$.aborted] = fn ? [fn] : []
     this.method.charCodeAt(0) === 112 && read(this) // (p) cache reading on post, put, patch
     this.ip // ensure IP is read on first tick
     this.headers // ensure headers are read on first tick
