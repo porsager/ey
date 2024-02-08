@@ -188,9 +188,7 @@ export default class Request {
 
     async function start() {
       try {
-        await r.onData(buffer =>
-          stream.push(Buffer.from(buffer)) || r.pause()
-        )
+        await r.onData(buffer => stream.push(Buffer.from(buffer)) || r.pause())
         r.resume()
         stream.push(null)
       } catch (error) {
@@ -576,7 +574,7 @@ async function streamEnd(r, stream, total) {
 
   function read() {
     let buffer
-    while (null !== (buffer = stream.read())) {
+    while ((buffer = stream.read()) !== null) {
       lastOffset = r.getWriteOffset()
       const [ok, last] = r.tryEnd(buffer, total)
       if (last)
