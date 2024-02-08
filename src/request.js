@@ -165,8 +165,8 @@ export default class Request {
 
     return this[$.ip] = (proxyIP
       ? proxyIP.replace(/::ffff:/g, '').split(',')[0].trim()
-      : Buffer.compare(ipv4, remoteIP.slice(0, 12)) === 0
-        ? [...remoteIP.slice(12)].join('.')
+      : Buffer.compare(ipv4, remoteIP.subarray(0, 12)) === 0
+        ? [...remoteIP.subarray(12)].join('.')
         : Buffer.from(this[$.res].getRemoteAddressAsText()).toString()
     ).replace(/(^|:)0+/g, '$1').replace(/::+/g, '::')
   }
