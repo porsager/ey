@@ -674,7 +674,7 @@ function handled(r) {
 }
 
 function ended(r) {
-  r.ended = true
+  r.ended = r.handled = true
   r[$.ended] === null || r[$.ended].forEach(x => x())
 }
 
