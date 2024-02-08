@@ -497,7 +497,7 @@ async function readFile(r, file, type, compressor, o) {
     r.end(...response)
 }
 
-async function stream(r, type, { handle, stat, compressor }, options) {
+function stream(r, type, { handle, stat, compressor }, options) {
   const { size, mtime } = stat
       , range = r.headers.range || ''
       , highWaterMark = options.highWaterMark || options.minStreamSize
@@ -525,9 +525,9 @@ async function stream(r, type, { handle, stat, compressor }, options) {
     return r.end()
   }
 
-  compressor
-    ? await streamCompressed(r, handle, compressor, highWaterMark, total, start)
-    : await streamRaw(r, handle, highWaterMark, total, start)
+  return compressor
+    ? streamCompressed(r, handle, compressor, highWaterMark, total, start)
+    : streamRaw(r, handle, highWaterMark, total, start)
 }
 
 async function streamRaw(r, handle, highWaterMark, total, start) {
