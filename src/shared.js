@@ -30,5 +30,5 @@ export const symbols = {
   reading: Symbol('reading'),
   readable: Symbol('readable'),
   writable: Symbol('writable'),
-  responding: Symbol('responding'),
+  handling: Symbol('handling'),
 }

@@ -50,7 +50,7 @@ export default class Request {
     this.last = null
     this.ended = false
     this.paused = false
-    this.responding = false
+    this.handled = false
     this.aborted = false
     this.sentStatus = false
     this.sentHeaders = false
@@ -67,7 +67,7 @@ export default class Request {
     this[$.status] = null
     this[$.corked] = false
     this[$.onData] = null
-    this[$.responding] = null
+    this[$.handled] = null
     this[$.aborted] = null
     this[$.headers] = null
     this[$.reading] = null
@@ -263,10 +263,10 @@ export default class Request {
       : this[$.ended].push(fn)
   }
 
-  onRespond(fn) {
-    this[$.responding] === null
-      ? this[$.responding] = [fn]
-      : this[$.responding].push(fn)
+  onHandled(fn) {
+    this[$.handled] === null
+      ? this[$.handled] = [fn]
+      : this[$.handled].push(fn)
   }
 
   close() {
@@ -288,7 +288,7 @@ export default class Request {
       )
 
     return this.cork(async() => {
-      responding(this)
+      handled(this)
       if (this.method === 'head') {
         x instanceof Response
           ? x[stateSymbol].body.length !== undefined && !x.headers.has('content-length') && this[$.res].writeHeader('Content-Length', '' + x[stateSymbol].body.length)
@@ -416,7 +416,7 @@ export default class Request {
     if (this.ended)
       return true
 
-    responding(this)
+    handled(this)
     return this.cork(() =>
       this.method === 'head'
         ? this.end()
@@ -665,12 +665,12 @@ function aborted(r) {
   ended(r)
 }
 
-function responding(r) {
-  if (r.responding)
+function handled(r) {
+  if (r.handled)
     return
 
-  r.responding = true
-  r[$.responding] === null || r[$.responding].forEach(x => x())
+  r.handled = true
+  r[$.handled] === null || r[$.handled].forEach(x => x())
 }
 
 function ended(r) {
@@ -686,7 +686,7 @@ function read(r) {
   if (r[$.reading] !== null)
     return r[$.reading]
 
-  return r.responding || (r[$.reading] = new Promise((resolve, reject) =>
+  return r.handled || (r[$.reading] = new Promise((resolve, reject) =>
     r[$.res].onData((x, last) => {
       try {
         r[$.onData]
