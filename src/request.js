@@ -462,16 +462,19 @@ export default class Request {
 async function readFile(r, file, type, compressor, o) {
   r.onAborted()
   let handle
+    , stat
 
   try {
     handle = await fsp.open(file)
+    stat = await handle.stat()
+    if (!stat.isFile() && o.fallthrough)
+      return handle.close()
   } catch (error) {
-    if (o.fallthrough && (error.code === 'ENOENT' || error.code === 'EISDIR'))
+    if (o.fallthrough && error.code === 'ENOENT')
       return
+    handle && handle.close()
     throw error
   }
-
-  const stat = await handle.stat()
 
   if (stat.size < o.minCompressSize)
     compressor = null
@@ -521,7 +524,6 @@ function stream(r, type, { handle, stat, compressor }, options) {
     'Content-Encoding': compressor,
     'Content-Range': range && 'bytes ' + start + '-' + end + '/' + size,
     'Content-Type': type,
-    Connection: 'keep-alive', // really ? needed ?
     ETag: createEtag(mtime, size, compressor)
   })
 
