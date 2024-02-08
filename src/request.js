@@ -221,7 +221,7 @@ export default class Request {
       }
     })
 
-    r.onAborted(() => writable.destroy(new Error('Aborted')))
+    r.onAborted(() => writable.destroy())
 
     return writable
   }
