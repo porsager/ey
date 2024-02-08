@@ -124,6 +124,7 @@ export default class Request {
 
     this.method.charCodeAt(0) === 112 && read(this) // (p) cache reading on post, put, patch
     this.ip // ensure IP is read on first tick
+    this.headers // ensure headers are read on first tick
     this[$.req] = null
     return this[$.res].onAborted(() => aborted(this))
   }
