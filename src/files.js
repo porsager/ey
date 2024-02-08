@@ -3,6 +3,7 @@ import path from 'node:path'
 const rewrites = new Map()
 const trimSlash = x => x.charCodeAt(x.length - 1) === 47 ? x.slice(0, -1) : x
 const notFound = x => x.code === 'ENOENT' || x.code === 'EISDIR'
+const hasOwn = {}.hasOwnProperty
 
 export default function(Ey) {
   return function files(folder, o) {
@@ -11,11 +12,8 @@ export default function(Ey) {
       folder = ''
     }
 
-    const {
-      rewrite = true,
-      fallthrough = true,
-      ...options
-    } = o || {}
+    hasOwn.call(o, 'rewrite') || (o.rewrite = true)
+    hasOwn.call(o, 'fallthrough') || (o.fallthrough = true)
 
     folder = path.isAbsolute(folder)
       ? folder
@@ -26,17 +24,12 @@ export default function(Ey) {
     function cache(r) {
       const url = trimSlash(r.pathname)
 
-      if (rewrite && r.headers.accept && r.headers.accept.indexOf('text/html') === 0 && rewrites.has(url))
+      if (o.rewrite && r.headers.accept && r.headers.accept.indexOf('text/html') === 0 && rewrites.has(url))
         return r.url = rewrites.get(url)
     }
 
     async function file(r) {
-      try {
-        await r.file(resolve(r.url), options)
-      } catch (error) {
-        if (!fallthrough || !notFound(error))
-          throw error
-      }
+      return r.file(resolve(r.url), o)
     }
 
     function index(r) {

@@ -463,7 +463,13 @@ async function readFile(r, file, type, compressor, o) {
   r.onAborted()
   let handle
 
+  try {
     handle = await fsp.open(file)
+  } catch(error) {
+    if (!o.fallthrough || (x.code === 'ENOENT' || x.code === 'EISDIR'))
+      throw error
+  }
+
     const stat = await handle.stat()
 
     if (stat.size < o.minCompressSize)
