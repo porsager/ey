@@ -11,7 +11,6 @@ import { pipeline }             from 'node:stream/promises'
 import mimes, { compressable }  from './mimes.js'
 import { symbols as $, copy, isPromise }  from './shared.js'
 
-const stateSymbol = Object.getOwnPropertySymbols(new Response()).find(sym => sym.toString() === 'Symbol(state)')
 const cwd = process.cwd()
 const ipv4 = Buffer.from('00000000000000000000ffff', 'hex')
 
@@ -275,37 +274,16 @@ export default class Request {
   }
 
   end(x, status, headers) {
-    x instanceof Response
-      ? (
-        this.status(x.status),
-        x.headers.forEach((v, h) => this.header(h, v))
-      )
-      : (
-        typeof status === 'object' && (headers = status, status = null),
-        status && this.status(status),
-        headers && this.header(headers)
-      )
+    typeof status === 'object' && (headers = status, status = null),
+    status && this.status(status),
+    headers && this.header(headers)
 
     return this.cork(async() => {
       handled(this)
       if (this.method === 'head') {
-        x instanceof Response
-          ? x[stateSymbol].body.length !== undefined && !x.headers.has('content-length') && this[$.res].writeHeader('Content-Length', '' + x[stateSymbol].body.length)
-          : x && this[$.length] === null && this[$.res].writeHeader('Content-Length', '' + Buffer.byteLength(x))
+        if (x && this[$.length] === null)
+          this[$.res].writeHeader('Content-Length', '' + Buffer.byteLength(x))
         this[$.res].endWithoutBody()
-      } else if (x instanceof Response) {
-        const length = this[$.length] === null ? x[stateSymbol].body.length !== undefined && x[stateSymbol].body.length : this[$.length]
-        length === 0
-          ? this[$.res].end()
-          : length
-          ? await streamEnd(this, Readable.fromWeb(x.body), length)
-          : await pipeline(Readable.fromWeb(x.body), this.writable)
-      } else if (x instanceof Readable) {
-        this[$.length] === 0
-          ? this[$.res].end()
-          : this[$.length]
-          ? await streamEnd(this, x, this[$.length])
-          : await pipeline(x, this.writable)
       } else {
         this[$.res].end(x)
       }
@@ -330,10 +308,9 @@ export default class Request {
     }
     typeof h === 'object'
       ? Object.entries(h).forEach(xs => this.header(...xs))
-      : (h.toLowerCase() === 'content-length' && (this[$.length] = v), (v || v === 0) && (this[$.headers]
-        ? this[$.headers].push(['' + h, '' + v])
-        : this[$.headers] = [['' + h, '' + v]]
-      ))
+      : h.toLowerCase() === 'content-length'
+      ? this[$.length] = parseInt(v)
+      : this[$.headers] = [['' + h, v === 0 ? '0' : '' + v]]
     return this
   }
 
