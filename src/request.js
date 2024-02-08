@@ -466,8 +466,9 @@ async function readFile(r, file, type, compressor, o) {
   try {
     handle = await fsp.open(file)
   } catch (error) {
-    if (!o.fallthrough || (error.code === 'ENOENT' || error.code === 'EISDIR'))
-      throw error
+    if (o.fallthrough && (error.code === 'ENOENT' || error.code === 'EISDIR'))
+      return
+    throw error
   }
 
   const stat = await handle.stat()
