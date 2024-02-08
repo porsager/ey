@@ -463,7 +463,6 @@ async function readFile(r, file, type, compressor, o) {
   r.onAborted()
   let handle
 
-  try {
     handle = await fsp.open(file)
     const stat = await handle.stat()
 
@@ -471,12 +470,11 @@ async function readFile(r, file, type, compressor, o) {
       compressor = null
 
     if (r.headers.range || (stat.size >= o.minStreamSize && stat.size > o.maxCacheSize))
-      return await stream(r, type, { handle, stat, compressor }, o)
+      return stream(r, type, { handle, stat, compressor }, o).finally(() => handle.close())
 
     let bytes = await handle.readFile()
 
     handle.close()
-    handle = null
 
     if (o.transform) {
       bytes = o.transform(bytes, file, type, r)
@@ -497,9 +495,6 @@ async function readFile(r, file, type, compressor, o) {
     const response = [bytes, 200, headers]
     o.cache && stat.size < o.maxCacheSize && caches[compressor || 'identity'].set(file, response)
     r.end(...response)
-  } finally {
-    handle && handle.close()
-  }
 }
 
 async function stream(r, type, { handle, stat, compressor }, options) {
