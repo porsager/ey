@@ -7,6 +7,7 @@ import path                     from 'node:path'
 import { STATUS_CODES }         from 'node:http'
 import { Readable, Writable }   from 'node:stream'
 
+import proxy from './proxy.js'
 import mimes, { compressable }  from './mimes.js'
 import { symbols as $, copy, isPromise }  from './shared.js'
 
@@ -378,6 +379,11 @@ export default class Request {
       this[$.corked] = false
       return result
     })
+  }
+
+  proxy(url, options) {
+    handled(this)
+    proxy(this, url, options)
   }
 
   tryEnd(x, total) {
