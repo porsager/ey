@@ -364,6 +364,8 @@ export default class Request {
   }
 
   getWriteOffset() {
+    // getWriteOffset has thrown aborted even without onAborted being called.
+    // Might need try catch if reproducable
     return this.ended
       ? -1
       : this[$.res].getWriteOffset()
