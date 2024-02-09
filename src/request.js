@@ -461,9 +461,9 @@ async function readFile(r, file, type, compressor, o) {
     if (!stat.isFile() && o.fallthrough)
       return handle.close()
   } catch (error) {
+    handle && handle.close()
     if (o.fallthrough && error.code === 'ENOENT')
       return
-    handle && handle.close()
     throw error
   }
 
@@ -476,6 +476,7 @@ async function readFile(r, file, type, compressor, o) {
   let bytes = await handle.readFile()
 
   handle.close()
+  handle = null
 
   if (o.transform) {
     bytes = o.transform(bytes, file, type, r)
