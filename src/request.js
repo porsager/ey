@@ -286,7 +286,7 @@ export default class Request {
         this[$.res].endWithoutBody()
       } else {
         this[$.res].end(
-          x instanceof ArrayBuffer || typeof x === 'string'
+          typeof x === 'string' || x instanceof ArrayBuffer || (x && x.buffer instanceof ArrayBuffer)
             ? x
             : '' + x
         )
