@@ -125,7 +125,7 @@ function open(r, url, x, xs, head) {
   function start(...xs) {
     [r, url, head] = xs
     clearTimeout(timer)
-    i = header = body =  colon = char =  space = offset = -1
+    i = header = body = colon = char = space = offset = -1
     name = value = ''
     aborted = null
     r.onAborted(() => (aborted && aborted(), s.destroy()))
@@ -179,7 +179,7 @@ function Stack(xs = []) {
 
   function clear() {
     xs = []
-    l = 0
+    top = undefined
   }
 
   function push(x) {
