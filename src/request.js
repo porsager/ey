@@ -74,7 +74,7 @@ export default class Request {
     this[$.writable] = null
   }
 
-  async onData(fn) {
+  onData(fn) {
     this[$.onData] = fn
     if (this[$.data] !== null) {
       this[$.data].forEach(({ buffer, last }) => fn(buffer, last))
@@ -83,7 +83,7 @@ export default class Request {
     return read(this)
   }
 
-  async body(type) {
+  body(type) {
     if (this[$.body] !== null)
       return this[$.body]
 
@@ -278,7 +278,7 @@ export default class Request {
     status && this.status(status),
     headers && this.header(headers)
 
-    return this.cork(async() => {
+    return this.cork(() => {
       handled(this)
       if (this.method === 'head') {
         if (x && this[$.length] === null)
