@@ -6,7 +6,6 @@ import { promisify }            from 'node:util'
 import path                     from 'node:path'
 import { STATUS_CODES }         from 'node:http'
 import { Readable, Writable }   from 'node:stream'
-import { pipeline }             from 'node:stream/promises'
 
 import mimes, { compressable }  from './mimes.js'
 import { symbols as $, copy, isPromise }  from './shared.js'
@@ -546,41 +545,6 @@ async function streamRaw(r, handle, highWaterMark, total, start) {
         return ok
       })
     })
-  }
-}
-
-async function streamEnd(r, stream, total) {
-  let lastOffset = 0
-    , resolve
-    , reject
-    , promise = new Promise((r, e) => (resolve = r, reject = e))
-
-  stream.on('readable', read)
-  stream.on('error', reject)
-
-  read()
-
-  return promise
-
-  function read() {
-    let buffer
-    while ((buffer = stream.read()) !== null) {
-      lastOffset = r.getWriteOffset()
-      const [ok, last] = r.tryEnd(buffer, total)
-      if (last)
-        return resolve()
-
-      if (!ok) {
-        stream.pause()
-          r.onWritable(offset => {
-            const [ok, last] = r.tryEnd(buffer.subarray(offset - lastOffset), total)
-            last
-              ? resolve()
-            : ok && stream.resume()
-            return ok
-          })
-      }
-    }
   }
 }
 
