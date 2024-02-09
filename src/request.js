@@ -284,7 +284,11 @@ export default class Request {
           this[$.res].writeHeader('Content-Length', '' + Buffer.byteLength(x))
         this[$.res].endWithoutBody()
       } else {
-        this[$.res].end(x)
+        this[$.res].end(
+          x instanceof ArrayBuffer || typeof x === 'string'
+            ? x
+            : '' + x
+        )
       }
       ended(this)
     })
