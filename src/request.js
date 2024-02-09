@@ -306,11 +306,20 @@ export default class Request {
       h = v
       v = x
     }
-    typeof h === 'object'
-      ? Object.entries(h).forEach(xs => this.header(...xs))
-      : h.toLowerCase() === 'content-length'
-      ? this[$.length] = parseInt(v)
-      : this[$.headers] = [['' + h, v === 0 ? '0' : '' + v]]
+
+    if (typeof h === 'object') {
+      Object.entries(h).forEach(xs => this.header(...xs))
+    } else if (v || v === 0 || v === '') {
+      const lower = h.toLowerCase()
+      lower === 'content-length'
+        ? this[$.length] = parseInt(v)
+        : lower === 'date' || lower === 'uwebsockets'
+        ? null // ignore
+        : this[$.headers]
+        ? this[$.headers].push(['' + h, '' + v])
+        : this[$.headers] = [['' + h, '' + v]]
+    }
+
     return this
   }
 
@@ -496,10 +505,10 @@ function stream(r, type, { handle, stat, compressor }, options) {
     return r.header(416, { 'Content-Range': 'bytes */' + (size - 1) }).end('Range Not Satisfiable')
 
   r.header(range ? 206 : 200, {
-    'Accept-Ranges': range ? undefined : 'bytes',
+    'Accept-Ranges': range ? 'bytes' : null,
     'Last-Modified': mtime.toUTCString(),
     'Content-Encoding': compressor,
-    'Content-Range': range && 'bytes ' + start + '-' + end + '/' + size,
+    'Content-Range': range ? 'bytes ' + start + '-' + end + '/' + size : null,
     'Content-Type': type,
     ETag: createEtag(mtime, size, compressor)
   })
