@@ -33,9 +33,9 @@ function remove(xs, host, x) {
     return
 
   const sockets = xs.get(host)
-  const socket = sockets.remove(x)
+  const i = sockets.indexOf(x)
+  i === -1 || sockets.splice(i, 1)
   sockets.length || xs.delete(host)
-  return socket
 }
 
 function open(r, url, x, xs, head) {
@@ -119,7 +119,7 @@ function open(r, url, x, xs, head) {
     timer = setTimeout(() => s.destroy(), keepAlive)
     xs.has(url.host)
       ? xs.get(url.host).push(start)
-      : xs.set(url.host, Stack([start]))
+      : xs.set(url.host, [start])
   }
 
   function start(...xs) {
@@ -153,49 +153,4 @@ function open(r, url, x, xs, head) {
       r.write(buffer)
     }
   }
-}
-
-function Stack(xs = []) {
-  let top = xs.pop()
-
-  return {
-    get length() { return top === undefined ? 0 : xs.length + 1 },
-    remove,
-    clear,
-    push,
-    peek,
-    pop
-  }
-
-  function remove(x) {
-    if (top === x)
-      return pop()
-
-    const i = xs.indexOf(x)
-    return i === -1
-      ? undefined
-      : xs.splice(i, 1)[0]
-  }
-
-  function clear() {
-    xs = []
-    top = undefined
-  }
-
-  function push(x) {
-    xs.push(top)
-    top = x
-    return x
-  }
-
-  function pop() {
-    const x = top
-    top = xs.pop()
-    return x
-  }
-
-  function peek() {
-    return top
-  }
-
 }
