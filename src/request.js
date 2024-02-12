@@ -283,6 +283,8 @@ export default class Request {
       if (this.method === 'head') {
         if (x && this[$.length] === null)
           this[$.res].writeHeader('Content-Length', '' + Buffer.byteLength(x))
+        else if (this[$.length] !== null)
+          this[$.res].writeHeader('Content-Length', '' + this[$.length])
         this[$.res].endWithoutBody()
       } else {
         this[$.res].end(
