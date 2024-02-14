@@ -18,7 +18,7 @@ export default function(r, url, options = {}) {
 
   return xs.has(url.host)
     ? reuse(r, url, xs, head)
-    : open(r, url, url.secure ? tls : net, xs, head)
+    : open(r, url, url.secure ? tls : net, xs, head, options)
 }
 
 function reuse(r, url, xs, head) {
@@ -38,7 +38,7 @@ function remove(xs, host, x) {
   sockets.length || xs.delete(host)
 }
 
-function open(r, url, x, xs, head) {
+function open(r, url, x, xs, head, options) {
   let i = -1
   let header = -1
   let body = -1
@@ -54,7 +54,10 @@ function open(r, url, x, xs, head) {
   const s = x.connect({
     host: url.hostname,
     port: url.port || (url.secure ? 443 : 80),
-    servername: url.secure && !net.isIP(url.host) ? url.host : undefined,
+    ...options,
+    servername: options.servername || options.headers?.host || (
+      url.secure && !net.isIP(url.host) ? url.host : undefined
+    ),
     onread: {
       buffer: Buffer.alloc(128 * 1024),
       callback: (length, buffer) => {
