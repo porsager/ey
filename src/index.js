@@ -172,8 +172,8 @@ export default function ey({
   }
 
   function close(fn, ws, code, data) {
+    ws[$.ws].open = false
     fn(ws[$.ws], code, new Message(data, true))
-    ws.open = false
   }
 
   function open(fn, ws) {
@@ -184,14 +184,16 @@ export default function ey({
     fn(ws[$.ws], new Message(data, binary))
   }
 
-  function catcher(name, handlers, fn = (fn, ws, ...xs) => fn(ws[$.ws], ...xs)) {
-    if (!(name in handlers))
+  function catcher(name, handlers, fn) {
+    if (!(name in handlers) && !fn)
       return
 
     const method = handlers[name]
     return function(ws, ...xs) {
       try {
-        fn(method, ws, ...xs)
+        fn
+          ? fn(method, ws, ...xs)
+          : method(ws[$.ws], ...xs)
       } catch (error) {
         name === 'close' || ws.end(1011, 'Internal Server Error')
         console.error(500, 'Uncaught ' + name + ' error', error) // eslint-disable-line
