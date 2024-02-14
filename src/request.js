@@ -9,7 +9,7 @@ import { Readable, Writable }   from 'node:stream'
 
 import proxy from './proxy.js'
 import mimes, { compressable }  from './mimes.js'
-import { symbols as $, copy, isPromise }  from './shared.js'
+import { symbols as $, isPromise }  from './shared.js'
 
 const cwd = process.cwd()
 const ipv4 = Buffer.from('00000000000000000000ffff', 'hex')
@@ -187,7 +187,7 @@ export default class Request {
 
     async function start() {
       try {
-        await r.onData(buffer => stream.push(Buffer.from(buffer)) || r.pause())
+        await r.onData(x => stream.push(Buffer.from(Buffer.from(x))) || r.pause())
         r.resume()
         stream.push(null)
       } catch (error) {
@@ -384,8 +384,8 @@ export default class Request {
   }
 
   proxy(url, options) {
-    handled(this)
     proxy(this, url, options)
+    handled(this)
   }
 
   tryEnd(x, total) {
@@ -659,7 +659,7 @@ function read(r) {
       try {
         r[$.onData]
           ? r[$.onData](x, last)
-          : (r[$.data] === null && (r[$.data] = []), r[$.data].push({ buffer: copy(x), last })) // must copy - uws clears memory in next tick
+          : (r[$.data] === null && (r[$.data] = []), r[$.data].push({ buffer: Buffer.from(Buffer.from(x)), last })) // must copy - uws clears memory in next tick
         last && resolve()
       } catch (error) {
         reject(error)

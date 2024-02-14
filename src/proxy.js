@@ -104,9 +104,14 @@ function open(r, url, x, xs, head, options) {
 
   r.onAborted(() => (aborted && aborted(), s.destroy()))
   s.setKeepAlive(true, keepAlive)
-  s.once('connect', () => s.write(head))
+  s.once('connect', connect)
   s.once('error', error)
   s.once('close', close)
+
+  function connect() {
+    s.write(head)
+    r.readable.pipe(s, { end: false })
+  }
 
   function error(error) {
     r.end(error, 500)
@@ -132,7 +137,7 @@ function open(r, url, x, xs, head, options) {
     name = value = ''
     aborted = null
     r.onAborted(() => (aborted && aborted(), s.destroy()))
-    s.write(head)
+    connect()
   }
 
   async function write(r, buffer) {

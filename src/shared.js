@@ -4,12 +4,6 @@ export function isPromise(x) {
   return x && typeof x.then === 'function'
 }
 
-export function copy(x) {
-  const copy = new Uint8Array(x.length)
-  copy.set(x)
-  return copy
-}
-
 export const symbols = {
   ip: Symbol('ip'),
   ws : Symbol('ws'),
