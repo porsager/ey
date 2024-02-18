@@ -533,7 +533,7 @@ function stream(r, type, { handle, stat, compressor }, options) {
     compressor
       ? r.header('Transfer-Encoding', 'chunked')
       : r.header('Content-Length', size)
-    return r.end()
+    return Promise.resolve(r.end())
   }
 
   return compressor
@@ -573,6 +573,11 @@ async function streamCompressed(r, handle, compressor, highWaterMark, total, sta
     , resolve
     , reject
     , resume
+
+  r.onAborted(() => {
+    resume && resume()
+    compressStream.destroy()
+  })
 
   const promise = new Promise((r, e) => (resolve = r, reject = e))
 
