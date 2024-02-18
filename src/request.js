@@ -569,7 +569,7 @@ async function streamCompressed(r, handle, compressor, highWaterMark, total, sta
   let read = 0
     , ok = true
     , buffer = Buffer.allocUnsafe(highWaterMark)
-    , compressStream = streamingCompressors[compressor]({ chunkSize: highWaterMark, finishFlush: zlib.constants.Z_SYNC_FLUSH })
+    , compressStream = streamingCompressors[compressor]({ chunkSize: highWaterMark })
     , resolve
     , reject
     , resume
