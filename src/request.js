@@ -584,7 +584,7 @@ async function streamCompressed(r, handle, compressor, highWaterMark, total, sta
   while (read < total) {
     const { bytesRead } = await handle.read(buffer, 0, Math.min(highWaterMark, total - read), start + read)
     read += bytesRead
-    compressStream.write(buffer.slice(0, bytesRead))
+    compressStream.write(buffer.subarray(0, bytesRead))
     ok || await new Promise(x => r.onWritable(() => (x(), true)))
     compressStream.writableNeedDrain && await new Promise(r => resume = r)
   }
