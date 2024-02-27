@@ -6,6 +6,7 @@ import { promisify }            from 'node:util'
 import path                     from 'node:path'
 import { STATUS_CODES }         from 'node:http'
 import { Readable, Writable }   from 'node:stream'
+import { pipeline }             from 'node:stream/promises'
 
 import proxy from './proxy.js'
 import mimes, { compressable }  from './mimes.js'
@@ -566,36 +567,8 @@ async function streamRaw(r, handle, highWaterMark, total, start) {
 }
 
 async function streamCompressed(r, handle, compressor, highWaterMark, total, start) {
-  let read = 0
-    , ok = true
-    , buffer = Buffer.allocUnsafe(highWaterMark)
-    , compressStream = streamingCompressors[compressor]({ chunkSize: highWaterMark })
-    , resolve
-    , reject
-    , resume
-
-  r.onAborted(() => {
-    resume && resume()
-    compressStream.destroy()
-  })
-
-  const promise = new Promise((r, e) => (resolve = r, reject = e))
-
-  compressStream.on('data', x => ok = r.write(x))
-  compressStream.on('drain', () => resume && resume())
-  compressStream.on('close', resolve)
-  compressStream.on('error', reject)
-
-  while (read < total) {
-    const { bytesRead } = await handle.read(buffer, 0, Math.min(highWaterMark, total - read), start + read)
-    read += bytesRead
-    compressStream.write(buffer.subarray(0, bytesRead))
-    ok || await new Promise(x => r.onWritable(() => (x(), true)))
-    compressStream.writableNeedDrain && await new Promise(r => resume = r)
-  }
-  compressStream.end()
-  await promise
-  r.end()
+  const compressStream = streamingCompressors[compressor]({ chunkSize: highWaterMark })
+  await pipeline(handle.createReadStream({ highWaterMark }), compressStream, r.writable)
 }
 
 function getEncoding(x, supported, type) {
